@@ -29,221 +29,182 @@ from src.voice.tts import LocalTTS
 from src.utils.latency_tracker import LatencyTracker
 
 # ---------------------------------------------------------
-# Page Configuration & Modern Theme Setup
+# Page Configuration & Clean Typography Styling
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Voice Data Analyst | Enterprise BI",
-    page_icon="🎙️",
+    page_title="Voice Data Analyst",
+    page_icon="none",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Design System (CSS)
+# Custom Design System: Clean, Minimalist Enterprise Theme (No Emojis)
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    /* Global Typography & Background */
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    /* Global Typography */
+    html, body, [class*="css"], [class*="st-"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* Top Brand Navigation Header */
+    /* Clean Brand Navigation Header */
     .brand-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 1.25rem 1.5rem;
         background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 16px;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
-        margin-bottom: 1.5rem;
-    }
-    .brand-title-group {
-        display: flex;
-        align-items: center;
-        gap: 0.85rem;
-    }
-    .brand-logo {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-        color: white;
-        box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+        margin-bottom: 1.25rem;
     }
     .brand-title {
-        font-size: 1.45rem;
-        font-weight: 800;
-        color: #0F172A;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #111827;
         letter-spacing: -0.02em;
         line-height: 1.2;
     }
     .brand-subtitle {
         font-size: 0.85rem;
-        color: #64748B;
-        font-weight: 500;
+        color: #6B7280;
+        font-weight: 400;
+        margin-top: 0.15rem;
     }
-    .status-badges {
+    .status-group {
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
     }
-    .status-chip {
+    .status-badge {
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
-        padding: 0.3rem 0.75rem;
-        border-radius: 9999px;
+        padding: 0.25rem 0.65rem;
+        border-radius: 4px;
         font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.01em;
+        font-weight: 500;
+        border: 1px solid #E5E7EB;
+        background: #F9FAFB;
+        color: #374151;
     }
-    .chip-green { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
-    .chip-blue  { background: #EEF2FF; color: #3730A3; border: 1px solid #C7D2FE; }
-    .chip-amber { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
-
-    /* Interaction Studio Card */
-    .studio-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 16px;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
-        margin-bottom: 1.5rem;
+    .status-dot-green {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #10B981;
     }
-    .studio-label {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 0.75rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+    .status-dot-blue {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #3B82F6;
     }
 
-    /* Executive Spoken Takeaway Hero Banner */
+    /* Executive Spoken Takeaway Banner */
     .executive-card {
-        background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%);
-        border: 1px solid #C7D2FE;
-        border-radius: 16px;
-        padding: 1.4rem 1.6rem;
-        margin: 1.25rem 0;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.06);
+        background: #F8FAFC;
+        border-left: 3px solid #1E293B;
+        border-top: 1px solid #E2E8F0;
+        border-right: 1px solid #E2E8F0;
+        border-bottom: 1px solid #E2E8F0;
+        border-radius: 6px;
+        padding: 1.2rem 1.4rem;
+        margin: 1rem 0;
     }
     .executive-tag {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #4F46E5;
-        margin-bottom: 0.4rem;
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
+        letter-spacing: 0.05em;
+        color: #64748B;
+        margin-bottom: 0.35rem;
     }
     .executive-speech {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
         font-weight: 600;
-        color: #1E1B4B;
+        color: #0F172A;
         line-height: 1.5;
     }
 
-    /* Diagnostic Pills */
-    .correction-alert {
+    /* Diagnostic Banners */
+    .alignment-alert {
         background: #F0FDF4;
-        border: 1px solid #BBF7D0;
-        border-radius: 10px;
-        padding: 0.7rem 1rem;
-        margin-bottom: 1rem;
-        font-size: 0.88rem;
-        color: #166534;
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
+        border: 1px solid #DCFCE7;
+        border-left: 3px solid #16A34A;
+        border-radius: 6px;
+        padding: 0.65rem 0.9rem;
+        margin-bottom: 0.85rem;
+        font-size: 0.85rem;
+        color: #15803D;
     }
     .security-alert {
         background: #FEF2F2;
-        border: 1px solid #FECACA;
-        border-radius: 10px;
-        padding: 0.9rem 1.2rem;
-        margin: 1rem 0;
+        border: 1px solid #FEE2E2;
+        border-left: 3px solid #DC2626;
+        border-radius: 6px;
+        padding: 0.85rem 1rem;
+        margin: 0.85rem 0;
         color: #991B1B;
-        font-size: 0.92rem;
+        font-size: 0.88rem;
         font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
     }
 
-    /* Metric Tiles Grid */
-    .metrics-grid {
+    /* Performance Metric Tiles */
+    .perf-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 0.75rem;
-        margin: 1rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 0.5rem;
+        margin-top: 0.5rem;
     }
-    .metric-tile {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 10px;
-        padding: 0.75rem 0.85rem;
+    .perf-tile {
+        background: #F9FAFB;
+        border: 1px solid #E5E7EB;
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
         text-align: center;
     }
-    .metric-tile-label {
-        font-size: 0.7rem;
+    .perf-tile-label {
+        font-size: 0.68rem;
         font-weight: 600;
-        color: #64748B;
+        color: #6B7280;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.04em;
     }
-    .metric-tile-val {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #0F172A;
-        margin-top: 0.2rem;
+    .perf-tile-val {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #111827;
+        margin-top: 0.15rem;
         font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Primary Button Overrides */
-    div.stButton > button:first-child {
-        background: #4F46E5 !important;
+    /* Streamlit Widget Polishing */
+    button[data-baseweb="tab"] {
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        color: #6B7280 !important;
+        padding: 0.5rem 1rem !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #111827 !important;
+        border-bottom-color: #111827 !important;
+        font-weight: 600 !important;
+    }
+    div.stButton > button {
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+        font-size: 0.88rem !important;
+    }
+    div.stButton > button[kind="primary"] {
+        background-color: #0F172A !important;
         color: #FFFFFF !important;
         border: none !important;
-        border-radius: 10px !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        padding: 0.55rem 1.25rem !important;
-        box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2) !important;
-        transition: all 0.2s ease !important;
     }
-    div.stButton > button:first-child:hover {
-        background: #4338CA !important;
-        box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3) !important;
-        transform: translateY(-1px);
-    }
-
-    /* Sidebar Database Card */
-    .db-card {
-        background: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 10px;
-        padding: 0.65rem 0.85rem;
-        margin-bottom: 0.5rem;
-    }
-    .db-title {
-        font-weight: 700;
-        font-size: 0.88rem;
-        color: #1E293B;
-    }
-    .db-meta {
-        font-size: 0.75rem;
-        color: #64748B;
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #1E293B !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -333,38 +294,35 @@ if "memory" not in st.session_state:
     st.session_state.memory = ConversationMemory()
 if "clarification_state" not in st.session_state:
     st.session_state.clarification_state = None
-if "active_prompt" not in st.session_state:
-    st.session_state.active_prompt = ""
+if "selected_query" not in st.session_state:
+    st.session_state.selected_query = ""
 
 
 # ---------------------------------------------------------
-# Top Navigation & Executive Brand Header
+# Top Navigation & Brand Header (Clean, No Emojis)
 # ---------------------------------------------------------
 st.markdown("""
 <div class="brand-header">
-    <div class="brand-title-group">
-        <div class="brand-logo">🎙️</div>
-        <div>
-            <div class="brand-title">Voice Data Analyst</div>
-            <div class="brand-subtitle">Conversational Business Intelligence • Multi-Source Relational Querying</div>
-        </div>
+    <div>
+        <div class="brand-title">Voice Data Analyst</div>
+        <div class="brand-subtitle">Natural Language & Voice Query Workspace for Multi-Engine Databases</div>
     </div>
-    <div class="status-badges">
-        <span class="status-chip chip-green">● Local ASR (faster-whisper)</span>
-        <span class="status-chip chip-green">● Local TTS (Offline SAPI5)</span>
-        <span class="status-chip chip-blue">● Groq 120B Reasoning</span>
-        <span class="status-chip chip-amber">● Zero-Trust AST Safe</span>
+    <div class="status-group">
+        <span class="status-badge"><span class="status-dot-green"></span> Offline ASR (faster-whisper)</span>
+        <span class="status-badge"><span class="status-dot-green"></span> Offline TTS (SAPI5)</span>
+        <span class="status-badge"><span class="status-dot-blue"></span> Groq 120B Reasoning</span>
+        <span class="status-badge"><span class="status-dot-blue"></span> AST Read-Only Safe</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
-# Sidebar: Modern Data Hub & Schema Navigator
+# Sidebar: Connected Databases (Clean, Professional)
 # ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🗄️ Connected Databases")
-    st.caption("Auto-profiled multi-engine sources:")
+    st.markdown("#### Connected Databases")
+    st.caption("Active data sources with auto-profiled schemas:")
 
     for src in db_mgr.list_sources():
         src_profile = profiles.get(src['name'], {})
@@ -373,15 +331,15 @@ with st.sidebar:
 
         with st.expander(f"{src['name']} ({engine_label})", expanded=False):
             st.markdown(f"**Description:** {src['description']}")
-            st.markdown(f"**Tables:** `{len(tables)}` | **Path:** `{Path(src['path']).name}`")
+            st.markdown(f"**Tables:** `{len(tables)}` | **Storage:** `{Path(src['path']).name}`")
             for tname, tinfo in tables.items():
                 col_names = [c["name"] for c in tinfo.get("columns", [])]
                 st.markdown(f"- **`{tname}`** ({tinfo.get('row_count', 0):,} rows)")
-                st.caption(f"Columns: {', '.join(col_names[:6])}{'...' if len(col_names) > 6 else ''}")
+                st.caption(f"Columns: {', '.join(col_names[:5])}{'...' if len(col_names) > 5 else ''}")
 
     st.markdown("---")
-    st.markdown("### ➕ Connect New Source")
-    up_tab, uri_tab = st.tabs(["📁 Upload File", "🔗 Database URI"])
+    st.markdown("#### Add Data Source")
+    up_tab, uri_tab = st.tabs(["Upload File", "Database URI"])
 
     with up_tab:
         uploaded_file = st.file_uploader("Upload CSV or SQLite (.db/.sqlite)", type=["csv", "sqlite", "db"], label_visibility="collapsed")
@@ -403,96 +361,92 @@ with st.sidebar:
                 if new_src:
                     profiles[new_src.name] = DatabaseProfiler(new_src).profile(sample_limit=5)
                     corrector.harvest_from_database(new_src)
-                    st.success(f"Connected '{file_name}' successfully!")
+                    st.success(f"Connected source '{file_name}'")
                     st.rerun()
 
     with uri_tab:
-        new_uri = st.text_input("Connection String", placeholder="postgresql://user:pass@localhost:5432/mydb")
-        new_name = st.text_input("Source Identifier", placeholder="pg_analytics")
-        if st.button("Connect Database"):
+        new_uri = st.text_input("Connection URI", placeholder="postgresql://user:pass@localhost:5432/mydb")
+        new_name = st.text_input("Identifier", placeholder="pg_analytics")
+        if st.button("Connect Database", use_container_width=True):
             if new_uri and new_name:
                 try:
                     if new_uri.startswith("sqlite"):
                         db_mgr.register_sqlite(new_name, new_uri.replace("sqlite:///", ""))
                     else:
                         db_mgr.register_postgres(new_name, new_uri)
-                    st.success(f"Connected to '{new_name}'!")
+                    st.success(f"Connected to '{new_name}'")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Connection failed: {e}")
+                    st.error(f"Connection error: {e}")
 
 
 # ---------------------------------------------------------
-# Hero Interaction Studio: Voice & Text
+# Main Interaction Card (Clean Container)
 # ---------------------------------------------------------
-st.markdown('<div class="studio-card">', unsafe_allow_html=True)
+query_card = st.container(border=True)
 
-# Quick Prompts / Benchmark Scenarios
-st.markdown('<div class="studio-label">⚡ Quick Analytical Prompts (One-Click Test)</div>', unsafe_allow_html=True)
-chip_col1, chip_col2, chip_col3, chip_col4, chip_col5 = st.columns(5)
+with query_card:
+    st.markdown("**Example Questions**")
+    prompt_mapping = {
+        "Total Revenue by Category": "What is the total revenue by product category?",
+        "Sales in São Paulo (Phonetic Test)": "What was the total revenue in san paulo?",
+        "Low Stock Products (Inventory DB)": "Which products in the inventory have stock quantity less than 50?",
+        "Sales Representative Quotas (CSV)": "List all sales representatives and their target quotas",
+        "Security Attack Test (Refusal)": "DROP TABLE customers;"
+    }
 
-with chip_col1:
-    if st.button("📊 Revenue by Category", use_container_width=True):
-        st.session_state.active_prompt = "What is the total revenue by product category?"
-with chip_col2:
-    if st.button("📍 Sales in São Paulo", use_container_width=True):
-        st.session_state.active_prompt = "What was the total revenue in san paulo?" # Deliberately mispronounced
-with chip_col3:
-    if st.button("📦 Low Stock (Inventory)", use_container_width=True):
-        st.session_state.active_prompt = "Which products in the inventory have stock quantity less than 50?"
-with chip_col4:
-    if st.button("💼 Sales Reps (CSV)", use_container_width=True):
-        st.session_state.active_prompt = "List all sales representatives and their target quotas"
-with chip_col5:
-    if st.button("🛡️ Test Attack Refusal", use_container_width=True):
-        st.session_state.active_prompt = "DROP TABLE customers;"
+    selected_pill = st.pills(
+        "Examples",
+        options=list(prompt_mapping.keys()),
+        selection_mode="single",
+        label_visibility="collapsed"
+    )
 
-st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+    if selected_pill:
+        st.session_state.selected_query = prompt_mapping[selected_pill]
 
-# Input Modality Selector
-input_tab_voice, input_tab_text = st.tabs(["🎙️ Spoken Voice Input (Microphone)", "⌨️ Natural Language Text Search"])
+    # Input Modality: Tabs for Voice and Text
+    tab_voice, tab_text = st.tabs(["Voice Input", "Text Query"])
 
-audio_val = None
-with input_tab_voice:
-    st.caption("Click the red record button, speak clearly into your microphone, then click stop:")
-    audio_val = st.audio_input("Record audio query", label_visibility="collapsed")
+    audio_val = None
+    with tab_voice:
+        st.caption("Click to record your question using your microphone (processed 100% offline via local faster-whisper):")
+        audio_val = st.audio_input("Microphone input", label_visibility="collapsed")
 
-text_val = ""
-ask_button = False
-with input_tab_text:
-    text_col1, text_col2 = st.columns([5, 1])
-    with text_col1:
-        text_val = st.text_input(
-            "Enter business question",
-            value=st.session_state.active_prompt,
-            placeholder="e.g. Which product categories had the highest sales revenue last quarter?",
-            label_visibility="collapsed"
-        )
-    with text_col2:
-        ask_button = st.button("Run Query", use_container_width=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
+    text_val = ""
+    ask_button = False
+    with tab_text:
+        text_col1, text_col2 = st.columns([5, 1])
+        with text_col1:
+            text_val = st.text_input(
+                "Query input",
+                value=st.session_state.selected_query,
+                placeholder="Ask a question about sales, inventory, or customers...",
+                label_visibility="collapsed"
+            )
+        with text_col2:
+            ask_button = st.button("Execute", type="primary", use_container_width=True)
 
 
 # ---------------------------------------------------------
-# Ambiguity Clarification Modal/Section
+# Ambiguity Clarification Modal
 # ---------------------------------------------------------
 if st.session_state.clarification_state:
     c_state = st.session_state.clarification_state
-    st.warning(f"❓ **Clarification Required:** {c_state['prompt']}")
+    st.warning(f"Clarification Required: {c_state['prompt']}")
     
     if "audio_path" in c_state and os.path.exists(c_state["audio_path"]):
         st.audio(c_state["audio_path"], format="audio/wav")
 
     cl_col1, cl_col2 = st.columns([4, 1])
     with cl_col1:
-        clarification_response = st.text_input("Your clarification response:", placeholder="e.g. by total spend / by order volume")
+        clarification_response = st.text_input("Clarification response", placeholder="e.g. by total spend / by order volume", label_visibility="collapsed")
     with cl_col2:
         if st.button("Submit Clarification", use_container_width=True):
             if clarification_response:
                 resolved_question = clarification_engine.resolve_clarification(c_state["original_question"], clarification_response)
                 st.session_state.clarification_state = None
-                st.session_state.active_prompt = resolved_question
+                st.session_state.selected_query = resolved_question
                 text_val = resolved_question
                 ask_button = True
                 st.rerun()
@@ -501,26 +455,26 @@ if st.session_state.clarification_state:
 # ---------------------------------------------------------
 # Query Execution Engine
 # ---------------------------------------------------------
-should_run = (audio_val is not None) or (ask_button and text_val.strip()) or (st.session_state.active_prompt and ask_button)
+should_run = (audio_val is not None) or (ask_button and text_val.strip()) or (st.session_state.selected_query and ask_button)
 
 if should_run and not st.session_state.clarification_state:
     tracker = LatencyTracker()
     raw_query = ""
     stt_latency = 0.0
 
-    # 1. Local Offline Speech Recognition (faster-whisper)
+    # 1. Local Speech-to-Text (faster-whisper)
     if audio_val is not None:
-        with st.spinner("Transcribing speech locally with faster-whisper (CPU int8)..."):
+        with st.spinner("Transcribing speech locally (CPU int8)..."):
             with tracker.time_stage("Local ASR"):
                 audio_bytes = audio_val.getvalue()
                 stt_result = stt_engine.transcribe_audio_bytes(audio_bytes)
                 raw_query = stt_result.get("text", "")
                 stt_latency = stt_result.get("latency", 0.0)
     else:
-        raw_query = text_val.strip() if text_val.strip() else st.session_state.active_prompt
+        raw_query = text_val.strip() if text_val.strip() else st.session_state.selected_query
 
     if not raw_query:
-        st.info("Please speak into the microphone or enter a query above.")
+        st.info("Please speak into the microphone or enter a question above.")
     else:
         # 2. Phonetic Domain Word Correction
         with tracker.time_stage("Domain Word Correction"):
@@ -530,10 +484,10 @@ if should_run and not st.session_state.clarification_state:
         if corrections_log:
             correction_pills = []
             for c in corrections_log:
-                correction_pills.append(f'<b>"{c["original"]}"</b> &rarr; <b>"{c["corrected"]}"</b>')
+                correction_pills.append(f'"{c["original"]}" → "{c["corrected"]}"')
             st.markdown(f"""
-            <div class="correction-alert">
-                <span>🔍 <b>Phonetic Domain Alignment:</b> Restored {', '.join(correction_pills)} against active database dictionary.</span>
+            <div class="alignment-alert">
+                Phonetic Alignment: Aligned {', '.join(correction_pills)} with active database entities.
             </div>
             """, unsafe_allow_html=True)
 
@@ -575,7 +529,7 @@ if should_run and not st.session_state.clarification_state:
             
             with tracker.time_stage("SQL Generation"):
                 if is_followup:
-                    st.toast("Conversational follow-up detected! Updating query context.", icon="🔄")
+                    st.toast("Follow-up context applied to query plan", icon="✓")
                     sql_res = st.session_state.memory.generate_followup_sql(
                         followup_question=final_question,
                         schema_prompt=schema_prompt,
@@ -592,7 +546,7 @@ if should_run and not st.session_state.clarification_state:
             if sql_res.get("refusal") or not sql_res.get("is_safe"):
                 st.markdown(f"""
                 <div class="security-alert">
-                    <span>🛡️ <b>Security Violation Refused:</b> {sql_res.get('reasoning', 'Unsafe statement blocked by AST guardrail. Read-only SELECT statements only.')}</span>
+                    Security Violation Refused: {sql_res.get('reasoning', 'Unsafe statement blocked by AST guardrail. Read-only SELECT statements only.')}
                 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -633,13 +587,13 @@ if should_run and not st.session_state.clarification_state:
                         audio_path, tts_latency = tts_engine.synthesize_to_file(spoken_insight)
 
                     # ---------------------------------------------------------
-                    # Executive Results Display
+                    # Results Section (Polished, Modern)
                     # ---------------------------------------------------------
                     
-                    # Executive Spoken Audio Banner
+                    # Executive Spoken Takeaway Card
                     st.markdown(f"""
                     <div class="executive-card">
-                        <div class="executive-tag">📢 Executive Spoken Insight</div>
+                        <div class="executive-tag">Executive Summary</div>
                         <div class="executive-speech">"{spoken_insight}"</div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -647,24 +601,24 @@ if should_run and not st.session_state.clarification_state:
                     if os.path.exists(audio_path):
                         st.audio(audio_path, format="audio/wav", autoplay=True)
 
-                    # KPI Summary Tiles
-                    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-                    with kpi_col1:
-                        st.metric("Target Database", target_source_name.upper())
-                    with kpi_col2:
-                        st.metric("Records Returned", f"{len(df_result):,}")
-                    with kpi_col3:
+                    # KPI Metrics Grid
+                    kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
+                    with kpi_c1:
+                        st.metric("Target Source", target_source_name.upper())
+                    with kpi_c2:
+                        st.metric("Total Rows", f"{len(df_result):,}")
+                    with kpi_c3:
                         numeric_cols = df_result.select_dtypes(include=[np.number]).columns
                         if len(numeric_cols) > 0:
                             primary_col = numeric_cols[0]
                             st.metric(f"Total {primary_col.replace('_', ' ').title()}", f"{df_result[primary_col].sum():,.2f}")
                         else:
                             st.metric("Status", "Completed")
-                    with kpi_col4:
-                        st.metric("End-to-End Latency", f"{tracker.total_latency():.2f}s")
+                    with kpi_c4:
+                        st.metric("Turnaround Time", f"{tracker.total_latency():.2f}s")
 
                     # Data Visualization & Table Tabs
-                    tab_vis, tab_data, tab_sql = st.tabs(["📈 Interactive Chart", "📋 Data Table", "🔍 SQL Query & AST"])
+                    tab_vis, tab_data, tab_sql = st.tabs(["Visualization", "Data Table", "Executed SQL"])
 
                     with tab_vis:
                         if chart_rec.get("show_chart") and not df_result.empty:
@@ -672,12 +626,12 @@ if should_run and not st.session_state.clarification_state:
                             fig = None
                             
                             custom_layout = dict(
-                                font=dict(family="Plus Jakarta Sans", size=12, color="#1E293B"),
+                                font=dict(family="Inter, sans-serif", size=12, color="#1F2937"),
                                 paper_bgcolor="rgba(0,0,0,0)",
                                 plot_bgcolor="rgba(0,0,0,0)",
                                 margin=dict(l=20, r=20, t=40, b=20),
-                                xaxis=dict(gridcolor="#E2E8F0"),
-                                yaxis=dict(gridcolor="#E2E8F0")
+                                xaxis=dict(gridcolor="#F3F4F6"),
+                                yaxis=dict(gridcolor="#F3F4F6")
                             )
 
                             if c_type == "bar":
@@ -686,7 +640,7 @@ if should_run and not st.session_state.clarification_state:
                                     x=chart_rec["x"],
                                     y=chart_rec["y"],
                                     title=f"<b>{chart_rec['title']}</b>",
-                                    color_discrete_sequence=["#4F46E5"]
+                                    color_discrete_sequence=["#1E293B"]
                                 )
                                 fig.update_traces(marker_line_width=0, marker_opacity=0.9)
                             elif c_type == "line":
@@ -696,7 +650,7 @@ if should_run and not st.session_state.clarification_state:
                                     y=chart_rec["y"],
                                     title=f"<b>{chart_rec['title']}</b>",
                                     markers=True,
-                                    color_discrete_sequence=["#10B981"]
+                                    color_discrete_sequence=["#2563EB"]
                                 )
                             elif c_type == "pie":
                                 fig = px.pie(
@@ -705,7 +659,7 @@ if should_run and not st.session_state.clarification_state:
                                     values=chart_rec["values"],
                                     title=f"<b>{chart_rec['title']}</b>",
                                     hole=0.45,
-                                    color_discrete_sequence=px.colors.sequential.Indigo
+                                    color_discrete_sequence=px.colors.sequential.Blues_r
                                 )
                             elif c_type == "scatter":
                                 fig = px.scatter(
@@ -713,7 +667,7 @@ if should_run and not st.session_state.clarification_state:
                                     x=chart_rec["x"],
                                     y=chart_rec["y"],
                                     title=f"<b>{chart_rec['title']}</b>",
-                                    color_discrete_sequence=["#6366F1"]
+                                    color_discrete_sequence=["#2563EB"]
                                 )
 
                             if fig:
@@ -728,7 +682,7 @@ if should_run and not st.session_state.clarification_state:
                         st.dataframe(df_result, use_container_width=True)
                         csv_data = df_result.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="⬇️ Export Dataset to CSV",
+                            label="Export Dataset to CSV",
                             data=csv_data,
                             file_name=f"{target_source_name}_query_result.csv",
                             mime="text/csv"
@@ -736,19 +690,19 @@ if should_run and not st.session_state.clarification_state:
 
                     with tab_sql:
                         st.code(final_sql, language="sql")
-                        st.caption(f"**Dialect:** `{dialect.upper()}` | **Safety Verification:** Passed Read-Only SELECT check via sqlglot AST")
+                        st.caption(f"Dialect: {dialect.upper()} | AST Security: Passed Read-Only SELECT check")
                         if sql_res.get("reasoning"):
-                            st.caption(f"**Planner Reasoning:** {sql_res['reasoning']}")
+                            st.caption(f"Planner Reasoning: {sql_res['reasoning']}")
 
                     # Latency Profile Breakdown
-                    st.markdown("### ⏱️ Performance & Latency Breakdown")
+                    st.markdown("#### Performance Breakdown")
                     st.markdown("""
-                    <div class="metrics-grid">
+                    <div class="perf-grid">
                     """ + "".join([
                         f"""
-                        <div class="metric-tile">
-                            <div class="metric-tile-label">{stage.replace('_', ' ')}</div>
-                            <div class="metric-tile-val">{duration:.3f}s</div>
+                        <div class="perf-tile">
+                            <div class="perf-tile-label">{stage.replace('_', ' ')}</div>
+                            <div class="perf-tile-val">{duration:.3f}s</div>
                         </div>
                         """
                         for stage, duration in tracker.timings.items()
