@@ -3,6 +3,7 @@ Fine-grained latency tracking and benchmarking utility.
 Measures timing across all pipeline stages from spoken input to spoken output.
 """
 import time
+from contextlib import contextmanager
 from typing import Dict, Any, List
 
 class LatencyTracker:
@@ -12,6 +13,16 @@ class LatencyTracker:
         self.timings: Dict[str, float] = {}
         self.stage_starts: Dict[str, float] = {}
         self.overall_start: float = time.time()
+
+    @contextmanager
+    def time_stage(self, stage_name: str):
+        """Context manager to measure and record execution time of a pipeline stage."""
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            duration = time.perf_counter() - t0
+            self.timings[stage_name] = round(duration, 4)
 
     def start_stage(self, stage_name: str):
         self.stage_starts[stage_name] = time.time()
@@ -43,3 +54,7 @@ class LatencyTracker:
             lines.append(f"| {stage.replace('_', ' ').title()} | {duration:.3f}s | {share:.1f}% |")
         lines.append(f"| **Total End-to-End** | **{total:.3f}s** | **100.0%** |")
         return "\n".join(lines)
+
+    def format_report(self) -> str:
+        """Alias for formatting the latency breakdown table/report."""
+        return self.format_summary_table()
