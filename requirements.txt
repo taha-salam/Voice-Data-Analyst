@@ -1,0 +1,26 @@
+# Web UI & Visualization
+streamlit>=1.35.0
+plotly>=5.20.0
+
+# Database & SQL Processing
+duckdb>=1.0.0
+sqlalchemy>=2.0.0
+sqlglot>=25.0.0
+pandas>=2.2.0
+
+# LLM Providers
+groq>=0.9.0
+google-genai>=1.0.0
+python-dotenv>=1.0.0
+
+# NLP & Entity Matching
+rapidfuzz>=3.9.0
+
+# Local Voice (STT & TTS)
+faster-whisper>=1.0.0
+av<14
+pyttsx3>=2.90
+soundfile>=0.12.0
+
+# Testing & Utilities
+pytest>=8.0.0

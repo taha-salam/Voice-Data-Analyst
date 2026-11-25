@@ -1,0 +1,5 @@
+rep_id,rep_name,region,target_sales,actual_sales,commission_rate
+REP_101,Alice Cooper,North,150000,172000,0.06
+REP_102,Bob Dylan,South,130000,118000,0.05
+REP_103,Charlie Parker,East,180000,195000,0.07
+REP_104,Diana Ross,West,200000,240000,0.08
