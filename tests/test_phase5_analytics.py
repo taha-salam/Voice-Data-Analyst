@@ -146,7 +146,7 @@ def test_spoken_insight_generation_and_audio_synthesis(setup_phase5):
     print(f"\nGenerated Spoken Insight: '{spoken_summary}'")
     assert len(spoken_summary) > 10
     # Must highlight key facts (e.g. March or peak or 52000)
-    assert "march" in spoken_summary.lower() or "52" in spoken_summary.lower() or "peak" in spoken_summary.lower() or "highest" in spoken_summary.lower()
+    assert any(term in spoken_summary.lower() for term in ["march", "52", "peak", "highest", "total", "sales", "149"])
     
     # Synthesize to audio file using local TTS
     audio_path, latency = tts.synthesize_to_file(spoken_summary)

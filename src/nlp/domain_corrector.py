@@ -28,7 +28,13 @@ class DomainWordCorrector:
             "rio de janero": "rio de janeiro",
             "belo": "belo horizonte",
             "bell horizon": "belo horizonte",
+            "bell horizonte": "belo horizonte",
             "bello horizonte": "belo horizonte",
+            "caxias do sol": "caxias do sul",
+            "caxias": "caxias do sul",
+            "porto allegre": "porto alegre",
+            "curitibia": "curitiba",
+            "joinvile": "joinville",
             "computers": "informatica_acessorios",
             "computer accessories": "informatica_acessorios",
             "health and beauty": "beleza_saude",
@@ -183,6 +189,8 @@ class DomainWordCorrector:
 
         matched_spans: Set[Tuple[int, int]] = set()
         
+        STOP_WORDS = {"the", "a", "an", "and", "for", "in", "by", "of", "to", "all", "top", "per", "how", "who", "show", "from", "at", "on", "with", "what", "is", "are", "many", "much"}
+        
         # Match spans from 3 words down to 1
         for span_len in (3, 2, 1):
             for i in range(n - span_len + 1):
@@ -190,10 +198,14 @@ class DomainWordCorrector:
                     continue
                     
                 span_words = words[i:i + span_len]
+                # If multi-word span starts or ends with a stop word, skip (let the inner sub-span match)
+                if span_len > 1 and (span_words[0].lower() in STOP_WORDS or span_words[-1].lower() in STOP_WORDS):
+                    continue
+                
                 phrase = " ".join(span_words).lower()
                 
                 # Skip trivial stop words
-                if len(phrase) <= 3 and phrase in {"the", "and", "for", "in", "by", "of", "to", "all", "top", "per", "how", "who", "show"}:
+                if phrase in STOP_WORDS:
                     continue
                     
                 match = process.extractOne(
@@ -208,7 +220,8 @@ class DomainWordCorrector:
                     canonical = self.entity_index[best_match]
                     orig_span_text = " ".join(span_words)
                     
-                    if orig_span_text.lower() != canonical.lower():
+                    is_already_present = bool(re.search(r'\b' + re.escape(canonical) + r'\b', corrected_text, flags=re.IGNORECASE))
+                    if orig_span_text.lower() != canonical.lower() and not is_already_present:
                         matched_spans.add((i, i + span_len))
                         pattern = r'\b' + re.escape(orig_span_text) + r'\b'
                         corrected_text = re.sub(pattern, canonical, corrected_text, count=1, flags=re.IGNORECASE)

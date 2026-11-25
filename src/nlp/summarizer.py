@@ -143,7 +143,7 @@ METRIC FACTS:
 
 INSTRUCTIONS:
 1. Explain the result in 1 to 2 short sentences designed for audio listening.
-2. State the key highlight (e.g. peak value, top contributor, percentage difference from average, or total count).
+2. State the key highlight (explicitly mention the peak/top contributor or the total).
 3. NEVER read the raw table or recite column names.
 4. Keep the voice confident, natural, and conversational.
 5. Return ONLY the spoken sentences.
@@ -154,13 +154,27 @@ INSTRUCTIONS:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=150
+                max_tokens=250
             )
-            raw_text = res.choices[0].message.content.strip()
-            # Clean any quotation marks
-            return raw_text.strip('"').strip("'")
+            raw_text = res.choices[0].message.content or ""
+            if not raw_text.strip() and hasattr(res.choices[0].message, "reasoning"):
+                raw_text = getattr(res.choices[0].message, "reasoning", "")
+            raw_text = raw_text.strip().strip('"').strip("'")
+            if raw_text:
+                return raw_text
         except Exception:
-            # Deterministic fallback summary if LLM call fails
+            pass
+
+        # Robust deterministic analytical summary if LLM call fails or returns empty
+        if not df.empty:
+            num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             if num_cols and len(df) > 1:
-                return f"The query returned {len(df)} records. The highest value was {df[num_cols[0]].max():,.2f}."
-            return f"The query completed successfully with {len(df)} records returned."
+                col = num_cols[0]
+                max_idx = df[col].idxmax()
+                label_cols = [c for c in df.columns if c != col]
+                label_val = df.loc[max_idx, label_cols[0]] if label_cols else "peak"
+                return f"Across {len(df)} records, {label_val} had the highest {col.replace('_', ' ')} at {df[col].max():,.2f}, with a total of {df[col].sum():,.2f}."
+            elif num_cols and len(df) == 1:
+                col = num_cols[0]
+                return f"The total {col.replace('_', ' ')} is {df[col].iloc[0]:,.2f} across the selected records."
+        return f"The query returned {len(df)} matching records successfully."
