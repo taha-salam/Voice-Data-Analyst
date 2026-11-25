@@ -1,0 +1,138 @@
+"""
+Conversational Memory & Voice Follow-ups Engine:
+Retains conversational state across queries and intelligently modifies previous SQL queries
+when users ask follow-up questions (e.g., 'now break it down by month', 'same for last year').
+"""
+import re
+import json
+from typing import Dict, Any, List, Optional
+from groq import Groq
+from src.config import Config
+from src.nlp.guardrails import SafetyGuardrail
+
+class ConversationTurn:
+    def __init__(self, question: str, sql: str, source_name: str, row_count: int = 0):
+        self.question = question
+        self.sql = sql
+        self.source_name = source_name
+        self.row_count = row_count
+
+class ConversationMemory:
+    """Maintains conversational context and handles multi-turn query refinement."""
+
+    FOLLOWUP_PATTERNS = [
+        re.compile(r'\b(now\s+)?break\s+(it\s+)?down\s+by\b', re.IGNORECASE),
+        re.compile(r'\b(now\s+)?group\s+by\b', re.IGNORECASE),
+        re.compile(r'\bsame\s+for\b', re.IGNORECASE),
+        re.compile(r'\bwhat\s+about\b', re.IGNORECASE),
+        re.compile(r'\band\s+for\b', re.IGNORECASE),
+        re.compile(r'\bonly\s+(in|for)\b', re.IGNORECASE),
+        re.compile(r'\bfilter\s+(by|for)\b', re.IGNORECASE),
+        re.compile(r'\binstead\s+of\b', re.IGNORECASE),
+        re.compile(r'\bsort\s+by\b', re.IGNORECASE),
+        re.compile(r'\b(show|give\s+me)\s+(only\s+)?top\s+\d+\b', re.IGNORECASE)
+    ]
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        self.turns: List[ConversationTurn] = []
+        self.api_key = api_key or Config.GROQ_API_KEY
+        self.model = model or Config.GROQ_MODEL
+        self.client = Groq(api_key=self.api_key)
+
+    def add_turn(self, question: str, sql: str, source_name: str, row_count: int = 0):
+        """Records a successful turn in conversation history."""
+        self.turns.append(ConversationTurn(question, sql, source_name, row_count))
+
+    def get_last_turn(self) -> Optional[ConversationTurn]:
+        """Returns the most recent conversation turn if available."""
+        return self.turns[-1] if self.turns else None
+
+    def is_followup(self, question: str) -> bool:
+        """Determines if the question is an iterative modification of the previous query."""
+        if not self.turns:
+            return False
+
+        q_lower = question.strip().lower()
+        
+        # Check explicit followup patterns
+        for pattern in self.FOLLOWUP_PATTERNS:
+            if pattern.search(q_lower):
+                return True
+
+        # Short elliptical questions like "and in 2023?" or "by category?"
+        words = q_lower.split()
+        if len(words) <= 5 and any(w in words for w in ["and", "or", "by", "for", "with", "only", "month", "quarter"]):
+            return True
+
+        return False
+
+    def generate_followup_sql(
+        self,
+        followup_question: str,
+        schema_prompt: str,
+        dialect: str = "sqlite"
+    ) -> Dict[str, Any]:
+        """
+        Modifies the previous query according to the follow-up request rather than restarting from scratch.
+        """
+        last_turn = self.get_last_turn()
+        if not last_turn:
+            raise ValueError("No previous conversation turn available for follow-up.")
+
+        prompt = f"""You are modifying an existing SQL query in '{dialect.upper()}' dialect based on a user follow-up instruction.
+
+PREVIOUS USER QUESTION:
+"{last_turn.question}"
+
+PREVIOUS SQL QUERY:
+{last_turn.sql}
+
+FOLLOW-UP INSTRUCTION:
+"{followup_question}"
+
+AVAILABLE DATABASE SCHEMA:
+{schema_prompt}
+
+INSTRUCTIONS:
+1. Modify the previous SQL query to satisfy the follow-up request (e.g. adjust WHERE clause, add GROUP BY, change time filter, or modify ORDER BY).
+2. DO NOT start from scratch if the base calculation remains the same.
+3. Keep the query strictly read-only SELECT.
+4. Output format: Return strictly JSON with keys "sql" and "reasoning".
+"""
+
+        try:
+            res = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=500,
+                response_format={"type": "json_object"}
+            )
+            data = json.loads(res.choices[0].message.content)
+            sql = data.get("sql", "").strip()
+            sql = re.sub(r'^```(?:sql)?\s*', '', sql, flags=re.IGNORECASE)
+            sql = re.sub(r'\s*```$', '', sql).strip()
+            reasoning = data.get("reasoning", "")
+        except Exception:
+            # Fallback direct generation
+            res = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=500
+            )
+            raw = res.choices[0].message.content.strip()
+            match = re.search(r'```(?:sql)?(.*?)```', raw, re.DOTALL)
+            sql = match.group(1).strip() if match else raw
+            reasoning = "Query modified based on follow-up."
+
+        # Safety validation
+        is_safe, error = SafetyGuardrail.validate_sql(sql, dialect=dialect)
+        return {
+            "sql": sql,
+            "reasoning": reasoning,
+            "is_safe": is_safe,
+            "is_followup": True,
+            "refusal": not is_safe,
+            "previous_sql": last_turn.sql
+        }

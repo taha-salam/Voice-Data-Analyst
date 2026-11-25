@@ -73,7 +73,9 @@ class SafetyGuardrail:
         if not sql_query or not sql_query.strip():
             return False, "Query is empty."
 
-        clean_sql = sql_query.strip().rstrip(';')
+        # Strip any markdown code fences if present
+        clean_sql = re.sub(r'^```(?:sql)?\s*', '', sql_query.strip(), flags=re.IGNORECASE)
+        clean_sql = re.sub(r'\s*```$', '', clean_sql.strip()).strip().rstrip(';')
 
         # 1. Regex check for hard-coded forbidden keywords
         if cls.FORBIDDEN_KEYWORDS_REGEX.search(clean_sql):
