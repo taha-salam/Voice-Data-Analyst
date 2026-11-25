@@ -5,7 +5,7 @@ when users ask follow-up questions (e.g., 'now break it down by month', 'same fo
 """
 import re
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from groq import Groq
 from src.config import Config
 from src.nlp.guardrails import SafetyGuardrail
@@ -105,34 +105,66 @@ INSTRUCTIONS:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=500,
+                max_tokens=1000,
                 response_format={"type": "json_object"}
             )
-            data = json.loads(res.choices[0].message.content)
-            sql = data.get("sql", "").strip()
-            sql = re.sub(r'^```(?:sql)?\s*', '', sql, flags=re.IGNORECASE)
-            sql = re.sub(r'\s*```$', '', sql).strip()
-            reasoning = data.get("reasoning", "")
+            raw_content = res.choices[0].message.content.strip()
+            sql, reasoning = self._extract_sql_and_reasoning(raw_content)
         except Exception:
             # Fallback direct generation
             res = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=500
+                max_tokens=1000
             )
-            raw = res.choices[0].message.content.strip()
-            match = re.search(r'```(?:sql)?(.*?)```', raw, re.DOTALL)
-            sql = match.group(1).strip() if match else raw
-            reasoning = "Query modified based on follow-up."
+            raw_content = res.choices[0].message.content.strip()
+            sql, reasoning = self._extract_sql_and_reasoning(raw_content)
 
         # Safety validation
         is_safe, error = SafetyGuardrail.validate_sql(sql, dialect=dialect)
         return {
             "sql": sql,
-            "reasoning": reasoning,
+            "reasoning": reasoning or "Query modified based on follow-up.",
             "is_safe": is_safe,
             "is_followup": True,
             "refusal": not is_safe,
             "previous_sql": last_turn.sql
         }
+
+    @staticmethod
+    def _extract_sql_and_reasoning(raw_text: str) -> Tuple[str, str]:
+        """Extracts SQL and reasoning cleanly whether JSON, markdown, or raw text is returned."""
+        # 1. Try JSON parsing
+        try:
+            data = json.loads(raw_text)
+            sql = data.get("sql", "").strip()
+            reasoning = data.get("reasoning", "")
+            sql = re.sub(r'^```(?:sql)?\s*', '', sql, flags=re.IGNORECASE)
+            sql = re.sub(r'\s*```$', '', sql).strip()
+            if sql:
+                return sql, reasoning
+        except Exception:
+            pass
+
+        # 2. Try regex extraction of "sql": "..."
+        json_sql_match = re.search(r'"sql"\s*:\s*"((?:[^"\\]|\\.)*)"', raw_text)
+        if json_sql_match:
+            try:
+                parsed_sql = json_sql_match.group(1).encode('utf-8').decode('unicode_escape')
+                return parsed_sql.strip(), "Extracted from response."
+            except Exception:
+                return json_sql_match.group(1).strip(), "Extracted from response."
+
+        # 3. Try markdown block
+        match = re.search(r'```(?:sql)?(.*?)```', raw_text, re.DOTALL)
+        if match:
+            return match.group(1).strip(), "Extracted from code block."
+
+        # 4. Try finding SELECT statement
+        match_select = re.search(r'\b(SELECT\s+.*)', raw_text, re.DOTALL | re.IGNORECASE)
+        if match_select:
+            clean_stmt = match_select.group(1).split(';')[0] + ';'
+            return clean_stmt.strip(), "Extracted statement."
+
+        return raw_text.strip(), ""
