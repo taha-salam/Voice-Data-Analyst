@@ -29,7 +29,7 @@ from src.voice.tts import LocalTTS
 from src.utils.latency_tracker import LatencyTracker
 
 # ---------------------------------------------------------
-# Page Configuration & Clean Typography Styling
+# Page Configuration
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Voice Data Analyst",
@@ -38,80 +38,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Design System: Clean, Minimalist Enterprise Theme (No Emojis)
+# Custom Styling: Clean, Minimalist Enterprise Theme without Icon Collision
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
-    /* Global Typography */
-    html, body, [class*="css"], [class*="st-"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    /* Clean Brand Navigation Header */
-    .brand-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.25rem 1.5rem;
-        background: #FFFFFF;
-        border: 1px solid #E5E7EB;
-        border-radius: 8px;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-        margin-bottom: 1.25rem;
-    }
-    .brand-title {
-        font-size: 1.35rem;
+    /* Clean Typography - Applied only to content, never overriding icon ligatures */
+    .main-title {
+        font-size: 1.6rem;
         font-weight: 700;
-        color: #111827;
+        color: #0F172A;
         letter-spacing: -0.02em;
-        line-height: 1.2;
+        margin-bottom: 0.2rem;
     }
-    .brand-subtitle {
-        font-size: 0.85rem;
-        color: #6B7280;
-        font-weight: 400;
-        margin-top: 0.15rem;
-    }
-    .status-group {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        padding: 0.25rem 0.65rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 500;
-        border: 1px solid #E5E7EB;
-        background: #F9FAFB;
-        color: #374151;
-    }
-    .status-dot-green {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background-color: #10B981;
-    }
-    .status-dot-blue {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background-color: #3B82F6;
+    .main-subtitle {
+        font-size: 0.9rem;
+        color: #64748B;
+        margin-bottom: 1.25rem;
     }
 
     /* Executive Spoken Takeaway Banner */
     .executive-card {
         background: #F8FAFC;
-        border-left: 3px solid #1E293B;
+        border-left: 3px solid #0F172A;
         border-top: 1px solid #E2E8F0;
         border-right: 1px solid #E2E8F0;
         border-bottom: 1px solid #E2E8F0;
         border-radius: 6px;
-        padding: 1.2rem 1.4rem;
+        padding: 1.1rem 1.3rem;
         margin: 1rem 0;
     }
     .executive-tag {
@@ -120,10 +72,10 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: #64748B;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.3rem;
     }
     .executive-speech {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 600;
         color: #0F172A;
         line-height: 1.5;
@@ -152,56 +104,13 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Performance Metric Tiles */
-    .perf-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-    }
-    .perf-tile {
-        background: #F9FAFB;
-        border: 1px solid #E5E7EB;
-        border-radius: 6px;
-        padding: 0.6rem 0.75rem;
-        text-align: center;
-    }
-    .perf-tile-label {
-        font-size: 0.68rem;
-        font-weight: 600;
-        color: #6B7280;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-    .perf-tile-val {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #111827;
-        margin-top: 0.15rem;
-        font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Streamlit Widget Polishing */
-    button[data-baseweb="tab"] {
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-        color: #6B7280 !important;
-        padding: 0.5rem 1rem !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #111827 !important;
-        border-bottom-color: #111827 !important;
-        font-weight: 600 !important;
-    }
-    div.stButton > button {
-        border-radius: 6px !important;
-        font-weight: 500 !important;
-        font-size: 0.88rem !important;
-    }
+    /* Primary Button Polish */
     div.stButton > button[kind="primary"] {
         background-color: #0F172A !important;
         color: #FFFFFF !important;
         border: none !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
     }
     div.stButton > button[kind="primary"]:hover {
         background-color: #1E293B !important;
@@ -299,50 +208,27 @@ if "selected_query" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# Top Navigation & Brand Header (Clean, No Emojis)
-# ---------------------------------------------------------
-st.markdown("""
-<div class="brand-header">
-    <div>
-        <div class="brand-title">Voice Data Analyst</div>
-        <div class="brand-subtitle">Natural Language & Voice Query Workspace for Multi-Engine Databases</div>
-    </div>
-    <div class="status-group">
-        <span class="status-badge"><span class="status-dot-green"></span> Offline ASR (faster-whisper)</span>
-        <span class="status-badge"><span class="status-dot-green"></span> Offline TTS (SAPI5)</span>
-        <span class="status-badge"><span class="status-dot-blue"></span> Groq 120B Reasoning</span>
-        <span class="status-badge"><span class="status-dot-blue"></span> AST Read-Only Safe</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------
-# Sidebar: Connected Databases (Clean, Professional)
+# Sidebar: Connected Data Sources (Clean, No Collisions)
 # ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("#### Connected Databases")
-    st.caption("Active data sources with auto-profiled schemas:")
+    st.markdown("### Data Sources")
+    st.caption("Connected database engines:")
 
     for src in db_mgr.list_sources():
         src_profile = profiles.get(src['name'], {})
         tables = src_profile.get("tables", {})
         engine_label = src['engine'].upper()
 
-        with st.expander(f"{src['name']} ({engine_label})", expanded=False):
-            st.markdown(f"**Description:** {src['description']}")
-            st.markdown(f"**Tables:** `{len(tables)}` | **Storage:** `{Path(src['path']).name}`")
-            for tname, tinfo in tables.items():
-                col_names = [c["name"] for c in tinfo.get("columns", [])]
-                st.markdown(f"- **`{tname}`** ({tinfo.get('row_count', 0):,} rows)")
-                st.caption(f"Columns: {', '.join(col_names[:5])}{'...' if len(col_names) > 5 else ''}")
+        st.markdown(f"**{src['name']}** `{engine_label}`")
+        table_names = list(tables.keys())
+        st.caption(f"{len(tables)} tables: {', '.join(table_names[:4])}{'...' if len(table_names) > 4 else ''}")
+        st.markdown("---")
 
-    st.markdown("---")
-    st.markdown("#### Add Data Source")
-    up_tab, uri_tab = st.tabs(["Upload File", "Database URI"])
+    st.markdown("### Connect Source")
+    up_tab, uri_tab = st.tabs(["CSV / SQLite File", "Database URI"])
 
     with up_tab:
-        uploaded_file = st.file_uploader("Upload CSV or SQLite (.db/.sqlite)", type=["csv", "sqlite", "db"], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Upload CSV or SQLite (.sqlite/.db)", type=["csv", "sqlite", "db"])
         if uploaded_file is not None:
             file_name = uploaded_file.name
             safe_name = Path(file_name).stem.lower().replace("-", "_").replace(" ", "_")
@@ -361,13 +247,13 @@ with st.sidebar:
                 if new_src:
                     profiles[new_src.name] = DatabaseProfiler(new_src).profile(sample_limit=5)
                     corrector.harvest_from_database(new_src)
-                    st.success(f"Connected source '{file_name}'")
+                    st.success(f"Connected '{file_name}'")
                     st.rerun()
 
     with uri_tab:
         new_uri = st.text_input("Connection URI", placeholder="postgresql://user:pass@localhost:5432/mydb")
         new_name = st.text_input("Identifier", placeholder="pg_analytics")
-        if st.button("Connect Database", use_container_width=True):
+        if st.button("Connect URI", use_container_width=True):
             if new_uri and new_name:
                 try:
                     if new_uri.startswith("sqlite"):
@@ -381,37 +267,38 @@ with st.sidebar:
 
 
 # ---------------------------------------------------------
-# Main Interaction Card (Clean Container)
+# Main Page Header & Query Studio
 # ---------------------------------------------------------
-query_card = st.container(border=True)
+st.markdown('<div class="main-title">Voice Data Analyst</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-subtitle">Ask questions about sales, inventory, or customers in natural English. Speech recognition and voice synthesis run 100% locally on device.</div>', unsafe_allow_html=True)
 
-with query_card:
-    st.markdown("**Example Questions**")
-    prompt_mapping = {
-        "Total Revenue by Category": "What is the total revenue by product category?",
-        "Sales in São Paulo (Phonetic Test)": "What was the total revenue in san paulo?",
-        "Low Stock Products (Inventory DB)": "Which products in the inventory have stock quantity less than 50?",
-        "Sales Representative Quotas (CSV)": "List all sales representatives and their target quotas",
-        "Security Attack Test (Refusal)": "DROP TABLE customers;"
-    }
+# Example Questions (Using native pills without button text truncation)
+prompt_mapping = {
+    "Total Revenue by Category": "What is the total revenue by product category?",
+    "Sales in São Paulo (Phonetic Test)": "What was the total revenue in san paulo?",
+    "Low Stock Products (Inventory DB)": "Which products in the inventory have stock quantity less than 50?",
+    "Sales Representative Quotas (CSV)": "List all sales representatives and their target quotas",
+    "Security Attack Test (Refusal)": "DROP TABLE customers;"
+}
 
-    selected_pill = st.pills(
-        "Examples",
-        options=list(prompt_mapping.keys()),
-        selection_mode="single",
-        label_visibility="collapsed"
-    )
+selected_pill = st.pills(
+    "Example Questions",
+    options=list(prompt_mapping.keys()),
+    selection_mode="single",
+    label_visibility="collapsed"
+)
 
-    if selected_pill:
-        st.session_state.selected_query = prompt_mapping[selected_pill]
+if selected_pill:
+    st.session_state.selected_query = prompt_mapping[selected_pill]
 
-    # Input Modality: Tabs for Voice and Text
+# Query Input Container
+with st.container(border=True):
     tab_voice, tab_text = st.tabs(["Voice Input", "Text Query"])
 
     audio_val = None
     with tab_voice:
-        st.caption("Click to record your question using your microphone (processed 100% offline via local faster-whisper):")
-        audio_val = st.audio_input("Microphone input", label_visibility="collapsed")
+        st.caption("Record your question using the microphone (transcribed offline via faster-whisper):")
+        audio_val = st.audio_input("Record question", label_visibility="collapsed")
 
     text_val = ""
     ask_button = False
@@ -419,13 +306,13 @@ with query_card:
         text_col1, text_col2 = st.columns([5, 1])
         with text_col1:
             text_val = st.text_input(
-                "Query input",
+                "Type question",
                 value=st.session_state.selected_query,
-                placeholder="Ask a question about sales, inventory, or customers...",
+                placeholder="e.g. Which product category had the highest sales revenue?",
                 label_visibility="collapsed"
             )
         with text_col2:
-            ask_button = st.button("Execute", type="primary", use_container_width=True)
+            ask_button = st.button("Run Query", type="primary", use_container_width=True)
 
 
 # ---------------------------------------------------------
@@ -587,7 +474,7 @@ if should_run and not st.session_state.clarification_state:
                         audio_path, tts_latency = tts_engine.synthesize_to_file(spoken_insight)
 
                     # ---------------------------------------------------------
-                    # Results Section (Polished, Modern)
+                    # Results Section (Clean, Non-Redundant)
                     # ---------------------------------------------------------
                     
                     # Executive Spoken Takeaway Card
@@ -601,10 +488,10 @@ if should_run and not st.session_state.clarification_state:
                     if os.path.exists(audio_path):
                         st.audio(audio_path, format="audio/wav", autoplay=True)
 
-                    # KPI Metrics Grid
+                    # Summary Metrics Row
                     kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
                     with kpi_c1:
-                        st.metric("Target Source", target_source_name.upper())
+                        st.metric("Database Source", target_source_name.upper())
                     with kpi_c2:
                         st.metric("Total Rows", f"{len(df_result):,}")
                     with kpi_c3:
@@ -694,18 +581,9 @@ if should_run and not st.session_state.clarification_state:
                         if sql_res.get("reasoning"):
                             st.caption(f"Planner Reasoning: {sql_res['reasoning']}")
 
-                    # Latency Profile Breakdown
+                    # Performance Breakdown (Module 10 Requirement)
                     st.markdown("#### Performance Breakdown")
-                    st.markdown("""
-                    <div class="perf-grid">
-                    """ + "".join([
-                        f"""
-                        <div class="perf-tile">
-                            <div class="perf-tile-label">{stage.replace('_', ' ')}</div>
-                            <div class="perf-tile-val">{duration:.3f}s</div>
-                        </div>
-                        """
-                        for stage, duration in tracker.timings.items()
-                    ]) + """
-                    </div>
-                    """, unsafe_allow_html=True)
+                    perf_cols = st.columns(len(tracker.timings))
+                    for col, (stage, duration) in zip(perf_cols, tracker.timings.items()):
+                        with col:
+                            st.metric(stage.replace('_', ' '), f"{duration:.3f}s")
