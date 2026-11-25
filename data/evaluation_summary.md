@@ -1,6 +1,6 @@
 # Voice Data Analyst — Empirical Evaluation & Benchmark Report
 
-**Execution Date:** 2026-11-25 18:38:29
+**Execution Date:** 2026-11-25 18:50:39
 
 ## 1. Domain Phonetic Word Error Rate (WER) & Entity Recovery
 
@@ -53,11 +53,11 @@
 
 | Pipeline Stage | Mean (ms) | Min (ms) | Max (ms) |
 | :--- | :--- | :--- | :--- |
-| **Domain Correction** | 2.55 ms | 1.35 ms | 3.77 ms |
-| **Source Routing** | 0.42 ms | 0.4 ms | 0.45 ms |
-| **Schema Linking** | 1.3 ms | 1.17 ms | 1.38 ms |
-| **Sql Generation** | 1861.78 ms | 1322.43 ms | 2368.05 ms |
-| **Db Execution** | 5.08 ms | 0.28 ms | 9.48 ms |
-| **Spoken Insight** | 547.02 ms | 0.01 ms | 895.9 ms |
-| **Tts Synthesis** | 301.04 ms | 154.62 ms | 549.88 ms |
-| **Total Turnaround** | 2719.21 ms | 2055.36 ms | 3671.72 ms |
+| **Domain Correction** | 2.23 ms | 0.9 ms | 3.54 ms |
+| **Source Routing** | 0.3 ms | 0.21 ms | 0.37 ms |
+| **Schema Linking** | 2.16 ms | 0.99 ms | 4.2 ms |
+| **Sql Generation** | 1454.81 ms | 901.95 ms | 1813.08 ms |
+| **Db Execution** | 3.69 ms | 2.92 ms | 4.51 ms |
+| **Spoken Insight** | 904.67 ms | 751.12 ms | 1027.12 ms |
+| **Tts Synthesis** | 172.5 ms | 158.11 ms | 185.45 ms |
+| **Total Turnaround** | 2540.39 ms | 2112.0 ms | 2778.78 ms |
