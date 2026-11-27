@@ -42,8 +42,11 @@ from src.ui.components import (
     render_kpi_cards,
     render_performance_panel,
     render_plotly_chart,
+    render_processing_waveform_html,
     render_routing_banner,
+    render_speaking_equalizer_html,
     render_transcript_comparison,
+    render_voice_orb,
     test_uri_connection,
 )
 
@@ -201,6 +204,8 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
+    sidebar_history_slot = st.empty()
+    st.markdown("---")
     st.markdown("### Connect Source")
     up_tab, uri_tab = st.tabs(["CSV / SQLite", "Postgres URI"])
 
@@ -276,7 +281,32 @@ with st.sidebar:
 # ---------------------------------------------------------
 render_header()
 
-# Example Questions (Using native pills without button text truncation)
+# Query Input Container (Voice Hero + Text Query)
+with st.container(border=True):
+    tab_voice, tab_text = st.tabs(["Voice Input", "Text Query"])
+
+    audio_val = None
+    with tab_voice:
+        render_voice_orb()
+        audio_val = st.audio_input("Record question", label_visibility="collapsed")
+        st.markdown('<div class="vda-voice-hint">Press the mic, speak, then press stop</div>', unsafe_allow_html=True)
+
+    text_val = ""
+    ask_button = False
+    with tab_text:
+        st.caption("Type a business question or select an example below.")
+        text_col1, text_col2 = st.columns([5, 1])
+        with text_col1:
+            text_val = st.text_input(
+                "Type question",
+                value=st.session_state.selected_query,
+                placeholder="e.g. Which product category had the highest sales revenue?",
+                label_visibility="collapsed"
+            )
+        with text_col2:
+            ask_button = st.button("Run Query", type="primary", use_container_width=True)
+
+# Example Questions (Single scrollable row under the input card)
 st.markdown('<div class="vda-section-label">Try an example</div>', unsafe_allow_html=True)
 prompt_mapping = {
     "Total Revenue by Category": "What is the total revenue by product category?",
@@ -293,33 +323,9 @@ selected_pill = st.pills(
     label_visibility="collapsed"
 )
 
-if selected_pill:
+if selected_pill and prompt_mapping[selected_pill] != st.session_state.selected_query:
     st.session_state.selected_query = prompt_mapping[selected_pill]
-
-# Query Input Container
-with st.container(border=True):
-    tab_voice, tab_text = st.tabs(["Voice Input", "Text Query"])
-
-    audio_val = None
-    with tab_voice:
-        st.markdown('<div class="vda-card-label" style="margin-bottom:4px;">Speak Your Question</div>', unsafe_allow_html=True)
-        st.caption("Click the microphone to record. Speech is transcribed locally with faster-whisper.")
-        audio_val = st.audio_input("Record question", label_visibility="collapsed")
-
-    text_val = ""
-    ask_button = False
-    with tab_text:
-        st.caption("Type a business question or pick an example above.")
-        text_col1, text_col2 = st.columns([5, 1])
-        with text_col1:
-            text_val = st.text_input(
-                "Type question",
-                value=st.session_state.selected_query,
-                placeholder="e.g. Which product category had the highest sales revenue?",
-                label_visibility="collapsed"
-            )
-        with text_col2:
-            ask_button = st.button("Run Query", type="primary", use_container_width=True)
+    st.rerun()
 
 
 # ---------------------------------------------------------
@@ -423,6 +429,8 @@ if should_run and not st.session_state.clarification_state:
     skip_ambiguity = False
 
     with st.status("Running query...", expanded=True) as status:
+        wave_slot = st.empty()
+
         # 1. Local Speech-to-Text (faster-whisper)
         if pending_job is not None:
             raw_query = pending_job["text"].strip()
@@ -431,6 +439,7 @@ if should_run and not st.session_state.clarification_state:
         elif new_voice_bytes is not None:
             is_voice_query = True
             status.update(label="Transcribing...")
+            wave_slot.markdown(render_processing_waveform_html("Transcribing"), unsafe_allow_html=True)
             st.write("Transcribing")
             with tracker.time_stage("Local ASR"):
                 stt_result = stt_engine.transcribe_audio_bytes(new_voice_bytes)
@@ -439,12 +448,14 @@ if should_run and not st.session_state.clarification_state:
             raw_query = text_val.strip() if text_val.strip() else st.session_state.selected_query.strip()
 
         if not raw_query:
+            wave_slot.empty()
             status.update(label="No question detected", state="error", expanded=False)
             st.session_state.last_result = {
                 "kind": "info",
                 "message": "Please speak into the microphone or enter a question above.",
             }
         elif not db_mgr.list_sources():
+            wave_slot.empty()
             status.update(label="No data sources connected", state="error", expanded=False)
             st.session_state.last_result = {
                 "kind": "db_error",
@@ -457,6 +468,7 @@ if should_run and not st.session_state.clarification_state:
         else:
             # 2. Phonetic Domain Word Correction
             status.update(label="Correcting...")
+            wave_slot.markdown(render_processing_waveform_html("Correcting"), unsafe_allow_html=True)
             st.write("Correcting")
             with tracker.time_stage("Domain Word Correction"):
                 corrected_query, corrections_log = corrector.correct_transcript(raw_query)
@@ -473,6 +485,7 @@ if should_run and not st.session_state.clarification_state:
             if needs_clarification:
                 clarifying_prompt = ambiguity_eval["clarification_prompt"]
                 status.update(label="Speaking clarification...")
+                wave_slot.markdown(render_processing_waveform_html("Speaking"), unsafe_allow_html=True)
                 st.write("Speaking")
                 audio_path, _ = tts_engine.synthesize_to_file(clarifying_prompt)
                 st.session_state.clarification_state = {
@@ -485,12 +498,14 @@ if should_run and not st.session_state.clarification_state:
 
             # 4. Multi-Source Routing
             status.update(label="Routing...")
+            wave_slot.markdown(render_processing_waveform_html("Routing"), unsafe_allow_html=True)
             st.write("Routing")
             with tracker.time_stage("Source Routing"):
                 target_source_name = router.route_query(final_question, profiles)
                 db_source = db_mgr.get_source(target_source_name)
 
             if not db_source:
+                wave_slot.empty()
                 status.update(label="Data source not found", state="error", expanded=False)
                 st.session_state.last_result = {
                     "kind": "db_error",
@@ -516,6 +531,7 @@ if should_run and not st.session_state.clarification_state:
                 previous_sql = last_turn.sql if last_turn else None
 
                 status.update(label="Generating SQL...")
+                wave_slot.markdown(render_processing_waveform_html("Generating SQL"), unsafe_allow_html=True)
                 st.write("Generating SQL")
                 with tracker.time_stage("SQL Generation"):
                     if is_followup:
@@ -546,6 +562,7 @@ if should_run and not st.session_state.clarification_state:
 
                 # 7. Zero-Trust Security Validation & Attack Refusal vs LLM Generation Error
                 if is_llm_error:
+                    wave_slot.empty()
                     status.update(label="Could not generate a query", state="error", expanded=False)
                     st.session_state.last_result = {
                         "kind": "llm_error",
@@ -565,9 +582,11 @@ if should_run and not st.session_state.clarification_state:
                     refusal_detail = reasoning_text or "Unsafe statement blocked by guardrail. Read-only SELECT statements only."
                     refusal_speech = "I cannot run that query because only read-only SELECT queries are allowed."
                     status.update(label="Speaking...")
+                    wave_slot.markdown(render_processing_waveform_html("Speaking"), unsafe_allow_html=True)
                     st.write("Speaking")
                     with tracker.time_stage("Local TTS"):
                         refusal_audio_path, _ = tts_engine.synthesize_to_file(refusal_speech)
+                    wave_slot.empty()
                     status.update(label="Query refused by safety guardrail", state="error", expanded=False)
                     st.session_state.last_result = {
                         "kind": "refusal",
@@ -590,6 +609,7 @@ if should_run and not st.session_state.clarification_state:
 
                     # 8. Database Execution with Autonomous Self-Repair
                     status.update(label="Running...")
+                    wave_slot.markdown(render_processing_waveform_html("Running"), unsafe_allow_html=True)
                     st.write("Running")
                     with tracker.time_stage("Database Execution"):
                         exec_result = repair_engine.execute_with_repair(
@@ -601,6 +621,7 @@ if should_run and not st.session_state.clarification_state:
                         )
 
                     if not exec_result["success"]:
+                        wave_slot.empty()
                         status.update(label="Database execution error", state="error", expanded=False)
                         st.session_state.last_result = {
                             "kind": "db_error",
@@ -637,6 +658,7 @@ if should_run and not st.session_state.clarification_state:
 
                         # 9. Analytics & Visualization Recommendation
                         status.update(label="Summarizing...")
+                        wave_slot.markdown(render_processing_waveform_html("Summarizing"), unsafe_allow_html=True)
                         st.write("Summarizing")
                         with tracker.time_stage("Visualization"):
                             chart_rec = analytics_engine.recommend_visualization(df_result)
@@ -647,10 +669,12 @@ if should_run and not st.session_state.clarification_state:
 
                         # 11. Local Offline TTS Audio Synthesis
                         status.update(label="Speaking...")
+                        wave_slot.markdown(render_processing_waveform_html("Speaking"), unsafe_allow_html=True)
                         st.write("Speaking")
                         with tracker.time_stage("Local TTS"):
                             audio_path, tts_latency = tts_engine.synthesize_to_file(spoken_insight)
 
+                        wave_slot.empty()
                         status.update(label="Query complete", state="complete", expanded=False)
 
                         st.session_state.last_result = {
@@ -749,12 +773,15 @@ if result is not None:
             if result.get("attempts", 1) > 1:
                 st.info(f"Self-repair resolved a SQL error in {result['attempts']} attempts.")
 
-            # Executive Spoken Takeaway Card (with audio player inside)
+            # Executive Spoken Takeaway Card (with equalizer and audio player inside)
             with st.container(border=True):
                 summary_html = "".join(
                     [
                         '<div class="vda-summary-marker">',
-                        '<div class="vda-card-label">Spoken Summary</div>',
+                        '<div class="vda-summary-top">',
+                        '<div class="vda-card-label" style="margin-bottom:0;">Spoken Summary</div>',
+                        render_speaking_equalizer_html(),
+                        "</div>",
                         f'<div class="vda-summary-text">"{html.escape(spoken_insight)}"</div>',
                         "</div>",
                     ]
@@ -826,11 +853,11 @@ if result is not None:
                 if result.get("sql_reasoning"):
                     st.caption(f"Reasoning: {result['sql_reasoning']}")
 
-            # Performance Breakdown (Module 10 Requirement)
-            st.markdown('<div class="vda-section-label" style="margin-top:16px;">Performance</div>', unsafe_allow_html=True)
+            # Performance Breakdown (Module 10 Requirement, collapsible and open by default)
             render_performance_panel(result.get("timings", {}))
 elif not st.session_state.clarification_state:
     render_empty_state(db_mgr.list_sources(), profiles)
 
-# Collapsible Conversation History (Task 5)
-render_history_section(st.session_state.query_history)
+# Collapsible Conversation History rendered in sidebar (Task 5)
+with sidebar_history_slot.container():
+    render_history_section(st.session_state.query_history)

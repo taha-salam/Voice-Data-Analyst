@@ -19,6 +19,7 @@ from src.db.connector import DatabaseSource
 from src.ui.styles import (
     ACCENT_PRIMARY,
     CHART_PALETTE,
+    TEXT_MUTED,
     TEXT_PRIMARY,
 )
 
@@ -64,7 +65,7 @@ def get_engine_badge_html(engine_type: str) -> str:
 
 
 def render_header() -> None:
-    """Render the compact title bar with subtitle and runtime status pills."""
+    """Render the sticky title bar with subtitle and runtime status pills."""
     header_html = "".join(
         [
             '<div class="vda-header">',
@@ -83,8 +84,59 @@ def render_header() -> None:
     st.markdown(header_html, unsafe_allow_html=True)
 
 
+def render_voice_orb() -> None:
+    """Render the idle CSS-only breathing voice orb placed above the audio input."""
+    orb_html = "".join(
+        [
+            '<div class="vda-voice-hero">',
+            '<div class="vda-orb-wrap" aria-hidden="true">',
+            '<div class="vda-orb-halo"></div>',
+            '<div class="vda-orb-core"></div>',
+            "</div>",
+            '<div class="vda-voice-instruction">Ask your data by voice</div>',
+            "</div>",
+        ]
+    )
+    st.markdown(orb_html, unsafe_allow_html=True)
+
+
+def render_processing_waveform_html(stage_label: str) -> str:
+    """Return HTML for the 6-bar animated processing waveform with the current stage name."""
+    safe_stage = html.escape(stage_label)
+    return "".join(
+        [
+            '<div class="vda-waveform-row">',
+            '<div class="vda-waveform-bars" aria-hidden="true">',
+            '<span class="vda-wave-bar"></span>',
+            '<span class="vda-wave-bar"></span>',
+            '<span class="vda-wave-bar"></span>',
+            '<span class="vda-wave-bar"></span>',
+            '<span class="vda-wave-bar"></span>',
+            '<span class="vda-wave-bar"></span>',
+            "</div>",
+            f'<span class="vda-waveform-label">{safe_stage}</span>',
+            "</div>",
+        ]
+    )
+
+
+def render_speaking_equalizer_html() -> str:
+    """Return HTML for a subtle 5-bar animated equalizer decoration for spoken answers."""
+    return "".join(
+        [
+            '<div class="vda-eq" aria-hidden="true">',
+            '<span class="vda-eq-bar"></span>',
+            '<span class="vda-eq-bar"></span>',
+            '<span class="vda-eq-bar"></span>',
+            '<span class="vda-eq-bar"></span>',
+            '<span class="vda-eq-bar"></span>',
+            "</div>",
+        ]
+    )
+
+
 def render_kpi_cards(kpi_items: List[Tuple[str, str]]) -> None:
-    """Render equal-width KPI cards with uppercase label, large value, and top accent border."""
+    """Render equal-width KPI cards with uppercase label, large value, and top gradient accent border."""
     if not kpi_items:
         return
     kpi_cols = st.columns(len(kpi_items))
@@ -102,7 +154,7 @@ def render_kpi_cards(kpi_items: List[Tuple[str, str]]) -> None:
 
 
 def render_empty_state(sources_list: List[Dict[str, Any]], profiles: Dict[str, Any]) -> None:
-    """Render a friendly panel below the input before any question has been asked."""
+    """Render a friendly panel below the input with numbered tips (1, 2, 3) and connected sources."""
     source_rows = []
     for src in sources_list:
         src_name = html.escape(src["name"])
@@ -138,9 +190,9 @@ def render_empty_state(sources_list: List[Dict[str, Any]], profiles: Dict[str, A
             '<div class="vda-empty-panel">',
             '<div class="vda-card-label">Getting Started</div>',
             '<div class="vda-empty-grid">',
-            '<div class="vda-tip-card">Ask about revenue by category</div>',
-            '<div class="vda-tip-card">Say \'now break it down by month\' to follow up</div>',
-            '<div class="vda-tip-card">Try a dangerous request to see the refusal</div>',
+            '<div class="vda-tip-card"><span class="vda-tip-num">1</span><span>Ask about revenue by category</span></div>',
+            '<div class="vda-tip-card"><span class="vda-tip-num">2</span><span>Say \'now break it down by month\' to follow up</span></div>',
+            '<div class="vda-tip-card"><span class="vda-tip-num">3</span><span>Try a dangerous request to see the refusal</span></div>',
             "</div>",
             sources_block,
             "</div>",
@@ -283,7 +335,7 @@ def render_transcript_comparison(
             for c in corrections_log
         )
         suffix = (
-            f'<div style="margin-top:6px;font-size:13.5px;color:#64748B;">Applied: {changes_summary}</div>'
+            f'<div style="margin-top:6px;font-size:13.5px;color:#94A3B8;">Applied: {changes_summary}</div>'
             if changes_summary
             else ""
         )
@@ -330,13 +382,14 @@ def render_routing_banner(
 
 def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> Tuple[Optional[Any], Optional[str]]:
     """
-    Build a Plotly chart styled with the app's accent color palette.
+    Build a dark-themed Plotly chart styled with the app's accent color palette.
     Returns (fig, note), where note is populated when a categorical bar chart is capped to top 15 rows.
     """
     c_type = chart_rec.get("chart_type")
     fig = None
     note = None
 
+    grid_rgba = "rgba(148, 163, 184, 0.14)"
     custom_layout = dict(
         font=dict(family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", size=14, color=TEXT_PRIMARY),
         paper_bgcolor="rgba(0,0,0,0)",
@@ -346,20 +399,21 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
             showgrid=False,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=13, color="#475569"),
-            title_font=dict(size=13, color="#64748B"),
+            tickfont=dict(size=13, color=TEXT_MUTED),
+            title_font=dict(size=13, color=TEXT_MUTED),
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor="#E2E8F0",
+            gridcolor=grid_rgba,
             gridwidth=1,
             showline=False,
             zeroline=False,
-            tickfont=dict(size=13, color="#475569"),
-            title_font=dict(size=13, color="#64748B"),
+            tickfont=dict(size=13, color=TEXT_MUTED),
+            title_font=dict(size=13, color=TEXT_MUTED),
         ),
         title=dict(font=dict(size=16, color=TEXT_PRIMARY), x=0, xanchor="left"),
-        hoverlabel=dict(bgcolor="#0F172A", font_color="#FFFFFF", font_size=13),
+        legend=dict(font=dict(size=13, color=TEXT_MUTED)),
+        hoverlabel=dict(bgcolor="#0B1020", bordercolor="#243049", font_color=TEXT_PRIMARY, font_size=13),
     )
 
     if c_type == "bar":
@@ -388,11 +442,11 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
             custom_layout["height"] = 480
             custom_layout["xaxis"] = dict(
                 showgrid=True,
-                gridcolor="#E2E8F0",
+                gridcolor=grid_rgba,
                 showline=False,
                 zeroline=False,
-                tickfont=dict(size=13, color="#475569"),
-                title_font=dict(size=13, color="#64748B"),
+                tickfont=dict(size=13, color=TEXT_MUTED),
+                title_font=dict(size=13, color=TEXT_MUTED),
             )
             custom_layout["yaxis"] = dict(
                 showgrid=False,
@@ -401,8 +455,8 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
                 autorange="reversed",
                 type="category",
                 automargin=True,
-                tickfont=dict(size=13, color="#475569"),
-                title_font=dict(size=13, color="#64748B"),
+                tickfont=dict(size=13, color=TEXT_PRIMARY),
+                title_font=dict(size=13, color=TEXT_MUTED),
             )
         else:
             fig = px.bar(
@@ -414,15 +468,65 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
             )
             fig.update_traces(marker_line_width=0, marker_opacity=0.92)
     elif c_type == "line":
+        x_col = chart_rec["x"]
+        y_col = chart_rec["y"]
+        plot_df = df_result.copy()
+        color_col = None
+
+        if x_col in plot_df.columns and y_col in plot_df.columns:
+            y_lower = str(y_col).lower()
+            agg_func = "mean" if any(k in y_lower for k in ("avg", "average", "rate", "score")) else "sum"
+            has_repeated_x = bool(plot_df[x_col].duplicated().any())
+
+            if has_repeated_x:
+                cat_cols = [
+                    c
+                    for c in plot_df.columns
+                    if c not in (x_col, y_col)
+                    and not pd.api.types.is_numeric_dtype(plot_df[c])
+                    and not pd.api.types.is_datetime64_any_dtype(plot_df[c])
+                ]
+                if cat_cols:
+                    chosen_cat = next(
+                        (c for c in cat_cols if 1 <= plot_df[c].nunique(dropna=True) <= 8),
+                        cat_cols[0],
+                    )
+                    n_groups = int(plot_df[chosen_cat].nunique(dropna=True))
+                    if 1 <= n_groups <= 8:
+                        if plot_df.duplicated(subset=[x_col, chosen_cat]).any():
+                            plot_df = (
+                                plot_df.groupby([x_col, chosen_cat], as_index=False, dropna=False)[y_col]
+                                .agg(agg_func)
+                            )
+                        color_col = chosen_cat
+                    else:
+                        plot_df = (
+                            plot_df.groupby(x_col, as_index=False, dropna=False)[y_col]
+                            .agg(agg_func)
+                        )
+                        note = f"Aggregated across {n_groups:,} groups. See the Data Table tab for all rows."
+                else:
+                    total_rows = len(plot_df)
+                    plot_df = (
+                        plot_df.groupby(x_col, as_index=False, dropna=False)[y_col]
+                        .agg(agg_func)
+                    )
+                    note = f"Aggregated across {total_rows:,} rows. See the Data Table tab for all rows."
+
+            plot_df = plot_df.sort_values(by=x_col, ascending=True)
+
         fig = px.line(
-            df_result,
-            x=chart_rec["x"],
-            y=chart_rec["y"],
+            plot_df,
+            x=x_col,
+            y=y_col,
+            color=color_col,
             title=chart_rec.get("title", ""),
             markers=True,
             color_discrete_sequence=CHART_PALETTE,
         )
         fig.update_traces(line=dict(width=2.5), marker=dict(size=7))
+        if color_col is not None:
+            custom_layout["showlegend"] = True
     elif c_type == "pie":
         fig = px.pie(
             df_result,
@@ -432,7 +536,7 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
             hole=0.48,
             color_discrete_sequence=CHART_PALETTE,
         )
-        fig.update_traces(textfont_size=13)
+        fig.update_traces(textfont_size=13, textfont_color=TEXT_PRIMARY)
     elif c_type == "scatter":
         fig = px.scatter(
             df_result,
@@ -441,7 +545,7 @@ def render_plotly_chart(df_result: pd.DataFrame, chart_rec: Dict[str, Any]) -> T
             title=chart_rec.get("title", ""),
             color_discrete_sequence=CHART_PALETTE,
         )
-        fig.update_traces(marker=dict(size=9, opacity=0.88))
+        fig.update_traces(marker=dict(size=9, opacity=0.9))
 
     if fig is not None:
         fig.update_layout(**custom_layout)
@@ -460,8 +564,8 @@ def compute_time_to_speech(timings: Dict[str, float]) -> float:
 
 def render_performance_panel(timings: Dict[str, float]) -> None:
     """
-    Task 7: Single compact card with headline time-to-speech at top right,
-    slimmer horizontal bars, and slowest stage highlighted in amber.
+    Task 7: Collapsible Performance section (open by default) with headline
+    time-to-speech at top right, slimmer bars, and slowest stage in amber.
     """
     if not timings:
         return
@@ -479,7 +583,7 @@ def render_performance_panel(timings: Dict[str, float]) -> None:
         pct_of_max = (duration / max_val * 100.0) if max_val > 0 else 0.0
         pct_of_total = (duration / total * 100.0) if total > 0 else 0.0
         stage_label = html.escape(stage.replace("_", " "))
-        slow_tag = ' <span style="color:#B45309;font-size:12px;font-weight:600;">(Slowest)</span>' if is_slowest else ""
+        slow_tag = ' <span style="color:#FBBF24;font-size:12px;font-weight:600;">(Slowest)</span>' if is_slowest else ""
 
         rows_html.append(
             "".join(
@@ -492,7 +596,7 @@ def render_performance_panel(timings: Dict[str, float]) -> None:
                     "</div>",
                     "</td>",
                     f'<td style="width:14%;text-align:right;font-variant-numeric:tabular-nums;">{duration:.3f}s</td>',
-                    f'<td style="width:12%;text-align:right;color:#64748B;font-variant-numeric:tabular-nums;">{pct_of_total:.1f}%</td>',
+                    f'<td style="width:12%;text-align:right;color:#94A3B8;font-variant-numeric:tabular-nums;">{pct_of_total:.1f}%</td>',
                     "</tr>",
                 ]
             )
@@ -500,11 +604,10 @@ def render_performance_panel(timings: Dict[str, float]) -> None:
 
     panel_html = "".join(
         [
-            '<div class="vda-perf-card">',
             '<div class="vda-perf-header">',
             "<div>",
             '<div class="vda-card-label" style="margin-bottom:4px;">Time Until Spoken Answer Starts</div>',
-            '<div style="font-size:13.5px;color:#64748B;">All pipeline stages up to and including local text-to-speech</div>',
+            '<div style="font-size:13.5px;color:#94A3B8;">All pipeline stages up to and including local text-to-speech</div>',
             "</div>",
             f'<div class="vda-perf-value">{time_to_speech:.2f}s</div>',
             "</div>",
@@ -519,10 +622,11 @@ def render_performance_panel(timings: Dict[str, float]) -> None:
             "".join(rows_html),
             "</tbody>",
             "</table>",
-            "</div>",
         ]
     )
-    st.markdown(panel_html, unsafe_allow_html=True)
+
+    with st.expander("Performance", expanded=True):
+        st.markdown(panel_html, unsafe_allow_html=True)
 
 
 def render_history_section(history: List[Dict[str, Any]]) -> None:
@@ -547,7 +651,7 @@ def render_history_section(history: List[Dict[str, Any]]) -> None:
                 "".join(
                     [
                         '<div class="vda-history-item">',
-                        f'<div style="font-weight:600;color:#0F172A;">#{turn_num}: {safe_q}</div>',
+                        f'<div style="font-weight:600;color:#E6EAF5;font-size:13.5px;">#{turn_num}: {safe_q}</div>',
                         '<div class="vda-history-meta">',
                         f'<span class="vda-badge-neutral">{safe_src}</span>',
                         f"<span>{row_count:,} rows</span>",
