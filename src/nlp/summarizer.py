@@ -122,7 +122,7 @@ class AnalyticsEngine:
                 label_cols = [c for c in df.columns if c != primary_metric]
                 top_label = top_row[label_cols[0]] if label_cols else "Peak"
                 
-                summary_facts.append(f"Primary Metric '{primary_metric}': Top '{top_label}' at {max_val:,.2f}, Average {avg_val:,.2f}, Total {total_val:,.2f}.")
+                summary_facts.append(f"Subset of {len(df)} rows: Top '{top_label}' at {max_val:,.2f}, Average {avg_val:,.2f}, Sum of returned rows {total_val:,.2f}.")
             except Exception:
                 pass
 
@@ -142,11 +142,11 @@ METRIC FACTS:
 {summary_facts}
 
 INSTRUCTIONS:
-1. Explain the result in 1 to 2 short sentences designed for audio listening.
-2. State the key highlight (explicitly mention the peak/top contributor or the total).
-3. NEVER read the raw table or recite column names.
-4. Keep the voice confident, natural, and conversational.
-5. Return ONLY the spoken sentences.
+1. Explain the result in ONE punchy sentence strictly under 20 words for fast audio listening.
+2. ACCURACY: You only have access to {len(df)} returned rows. If the query had a limit (e.g. top 10 or 100), phrase your summary strictly about the returned rows (e.g., 'Among the top {len(df)} records, X leads with...'). NEVER claim the returned sum represents all records across the whole database.
+3. State the key highlight (explicitly mention the peak/top contributor or the total of these rows).
+4. NEVER read the raw table or recite column names.
+5. Return ONLY the single spoken sentence.
 """
 
         try:
@@ -154,7 +154,7 @@ INSTRUCTIONS:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=250
+                max_tokens=100
             )
             raw_text = res.choices[0].message.content or ""
             if not raw_text.strip() and hasattr(res.choices[0].message, "reasoning"):
@@ -172,9 +172,12 @@ INSTRUCTIONS:
                 col = num_cols[0]
                 max_idx = df[col].idxmax()
                 label_cols = [c for c in df.columns if c != col]
-                label_val = df.loc[max_idx, label_cols[0]] if label_cols else "peak"
-                return f"Across {len(df)} records, {label_val} had the highest {col.replace('_', ' ')} at {df[col].max():,.2f}, with a total of {df[col].sum():,.2f}."
+                label_val = str(df.loc[max_idx, label_cols[0]]) if label_cols else "Peak"
+                col_title = col.replace('_', ' ')
+                if len(df) in (10, 100) or "limit" in sql.lower():
+                    return f"Among the top {len(df)} records returned, {label_val} leads with {df[col].max():,.2f} {col_title}."
+                return f"{label_val} leads with {df[col].max():,.2f} {col_title} across the {len(df)} records returned."
             elif num_cols and len(df) == 1:
                 col = num_cols[0]
-                return f"The total {col.replace('_', ' ')} is {df[col].iloc[0]:,.2f} across the selected records."
+                return f"The total {col.replace('_', ' ')} is {df[col].iloc[0]:,.2f} for this query."
         return f"The query returned {len(df)} matching records successfully."

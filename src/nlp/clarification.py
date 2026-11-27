@@ -6,6 +6,7 @@ and generates concise spoken clarifying questions with actionable choices instea
 import re
 import json
 from typing import Dict, Any, Tuple, Optional, List
+from rapidfuzz import fuzz
 from groq import Groq
 from src.config import Config
 
@@ -43,11 +44,14 @@ class ClarificationEngine:
     def evaluate_ambiguity(self, question: str) -> Dict[str, Any]:
         """
         Determines whether a question needs clarification before generating SQL.
-        Returns dict with 'needs_clarification', 'clarification_prompt', and 'options'.
+        Uses regex patterns, typo-tolerant fuzzy matching (rapidfuzz), and LLM fallback.
+        Returns dict with 'needs_clarification', 'clarification_prompt', and 'type'.
         """
         q_clean = question.strip()
+        q_lower = q_clean.lower()
+        words = re.findall(r'\b\w+\b', q_lower)
 
-        # 1. Fast heuristic pattern check
+        # 1. Fast regex heuristic pattern check
         for trigger_pat, qualifier_pat, question_text in self.AMBIGUITY_PATTERNS:
             if trigger_pat.search(q_clean):
                 if not qualifier_pat or not re.search(qualifier_pat, q_clean, re.IGNORECASE):
@@ -57,9 +61,43 @@ class ClarificationEngine:
                         "type": "heuristic"
                     }
 
-        # 2. LLM-based ambiguity check for open-ended queries (< 5 words with vague intent)
-        words = q_clean.split()
-        if len(words) <= 4 and not any(k in q_clean.lower() for k in ["how many", "count", "average", "avg", "total", "sum", "who is", "list"]):
+        # 2. Typo-tolerant fuzzy matching for "top/best" queries (e.g. "top cutomers", "best customrs")
+        has_ranking_intent = any(w in words for w in ["top", "best", "popular", "leading"]) or any(
+            fuzz.ratio(w, "top") >= 85 or fuzz.ratio(w, "best") >= 85 for w in words
+        )
+        if has_ranking_intent:
+            # Check for customers entity with typo tolerance
+            has_customers = any(fuzz.ratio(w, "customers") >= 80 or fuzz.ratio(w, "customer") >= 80 for w in words)
+            has_customer_metric = bool(re.search(r'by\s+(revenue|sales|spend|spending|orders|count|purchases)', q_lower))
+            if has_customers and not has_customer_metric:
+                return {
+                    "needs_clarification": True,
+                    "clarification_prompt": "Would you like top customers ranked by total spend or by total number of orders?",
+                    "type": "fuzzy_heuristic"
+                }
+
+            # Check for products entity with typo tolerance
+            has_products = any(fuzz.ratio(w, "products") >= 80 or fuzz.ratio(w, "product") >= 80 for w in words)
+            has_product_metric = bool(re.search(r'by\s+(revenue|sales|volume|quantity|units|reviews|rating)', q_lower))
+            if has_products and not has_product_metric:
+                return {
+                    "needs_clarification": True,
+                    "clarification_prompt": "Would you like top products ranked by total revenue or by units sold?",
+                    "type": "fuzzy_heuristic"
+                }
+
+            # Check for sellers entity with typo tolerance
+            has_sellers = any(fuzz.ratio(w, "sellers") >= 80 or fuzz.ratio(w, "seller") >= 80 for w in words)
+            has_seller_metric = bool(re.search(r'by\s+(revenue|sales|orders|volume)', q_lower))
+            if has_sellers and not has_seller_metric:
+                return {
+                    "needs_clarification": True,
+                    "clarification_prompt": "Would you like top sellers ranked by total sales revenue or by completed orders?",
+                    "type": "fuzzy_heuristic"
+                }
+
+        # 3. LLM-based ambiguity check for brief open-ended queries (<= 7 words with vague intent)
+        if len(words) <= 7 and not any(k in q_lower for k in ["how many", "count", "average", "avg", "total", "sum", "who is", "list"]):
             return self._llm_check_ambiguity(q_clean)
 
         return {
@@ -105,12 +143,37 @@ Return strictly JSON:
 
     @staticmethod
     def resolve_clarification(original_question: str, user_answer: str) -> str:
-        """Merges the user's spoken clarification with the original question."""
+        """
+        Merges the user's spoken clarification with the original question into a clean,
+        grammatical analytical query, enforcing default limit 10 for 'top' queries.
+        """
         orig = original_question.strip().rstrip("?.")
         ans = user_answer.strip().lower()
-        
-        # If user answer starts with "by", append directly
-        if ans.startswith("by "):
-            return f"{orig} {ans}"
+
+        # Clean conversational filler phrases from user speech
+        clean_ans = ans
+        fillers = [
+            "give me", "i want", "i would like", "can you show", "show me", "please",
+            "ranked by", "rank by", "filter by", "by", "what about", "how about"
+        ]
+        for filler in fillers:
+            if clean_ans.startswith(filler + " "):
+                clean_ans = clean_ans[len(filler):].strip()
+            elif clean_ans.endswith(" " + filler):
+                clean_ans = clean_ans[:-len(filler)].strip()
+
+        # Handle 'both' (e.g. "both", "give me both", "both spend and orders")
+        if "both" in ans:
+            metric_clause = "total spend and total number of orders"
+        elif any(k in clean_ans for k in ["spend", "spending", "revenue", "money", "sales", "dollar", "amount"]):
+            metric_clause = "total spend"
+        elif any(k in clean_ans for k in ["order", "orders", "count", "volume", "number of orders", "units", "quantity"]):
+            metric_clause = "total number of orders"
         else:
-            return f"{orig} by {ans}"
+            metric_clause = clean_ans or ans
+
+        # Normalize "top" without a number to "top 10" (e.g., "top customers" -> "top 10 customers")
+        orig_normalized = re.sub(r'\btop\s+(?!(\d+))\b', 'top 10 ', orig, flags=re.IGNORECASE)
+        orig_normalized = re.sub(r'\bbest\s+(?!(\d+))\b', 'top 10 ', orig_normalized, flags=re.IGNORECASE)
+
+        return f"{orig_normalized} ranked by {metric_clause}"

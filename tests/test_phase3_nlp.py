@@ -59,6 +59,11 @@ def test_domain_corrector_harvesting(setup_phase3):
     assert "boston" in index
     assert "chicago" in index
 
+    # Test removing entities from a specific source
+    corrector.remove_from_source("inventory")
+    # Custom aliases like sao paulo should remain, but inventory entities harvested are removed
+    assert "sao paulo" in corrector.entity_index
+
 def test_domain_word_correction_cities(setup_phase3):
     """Test correction of commonly misheard city names."""
     corrector = setup_phase3["corrector"]
@@ -127,6 +132,13 @@ def test_multisource_router(setup_phase3):
     # 1. Olist questions
     assert router.route_query("Which products brought in the most revenue last quarter?", profiles) == "olist"
     assert router.route_query("How many customers in sao paulo bought electronics?", profiles) == "olist"
+    assert router.route_query("What is the total revenue by product category?", profiles) == "olist"
+
+    # Detailed routing inspection
+    detailed = router.route_query_detailed("What is the total revenue by product category?", profiles)
+    assert detailed["source"] == "olist"
+    assert "olist" in detailed["scores"]
+    assert len(detailed["matched_terms"]) > 0
     
     # 2. Inventory secondary DB questions
     assert router.route_query("How many units of gaming laptops are in the Chicago warehouse?", profiles) == "inventory"

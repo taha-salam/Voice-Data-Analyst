@@ -199,8 +199,9 @@ with st.sidebar:
         )
         st.markdown(source_card_html, unsafe_allow_html=True)
         if st.button("Remove", key=f"remove_src_{src_name}", type="tertiary"):
-            db_mgr.sources.pop(src_name, None)
+            db_mgr.remove_source(src_name)
             profiles.pop(src_name, None)
+            corrector.remove_from_source(src_name)
             st.rerun()
 
     st.markdown("---")
@@ -544,11 +545,14 @@ if should_run and not st.session_state.clarification_state:
                             if sql_res.get("previous_sql"):
                                 previous_sql = sql_res["previous_sql"]
                         except Exception as exc:
+                            err_msg = str(exc)
                             sql_res = {
+                                "status": "error",
                                 "sql": None,
-                                "reasoning": f"LLM Generation Error: {exc}",
+                                "reasoning": f"LLM Generation Error: {err_msg}",
                                 "is_safe": False,
                                 "refusal": False,
+                                "error": err_msg,
                             }
                     else:
                         sql_res = sql_generator.generate_sql(
@@ -557,8 +561,10 @@ if should_run and not st.session_state.clarification_state:
                             dialect=dialect,
                         )
 
+                status_code = sql_res.get("status")
                 reasoning_text = str(sql_res.get("reasoning") or "")
-                is_llm_error = "LLM Generation Error" in reasoning_text
+                is_llm_error = (status_code == "error") or ("LLM Generation Error" in reasoning_text)
+                is_refusal = (status_code == "refused") or (sql_res.get("refusal") or not sql_res.get("is_safe"))
 
                 # 7. Zero-Trust Security Validation & Attack Refusal vs LLM Generation Error
                 if is_llm_error:
@@ -578,7 +584,7 @@ if should_run and not st.session_state.clarification_state:
                         "message": reasoning_text,
                         "timings": dict(tracker.timings),
                     }
-                elif sql_res.get("refusal") or not sql_res.get("is_safe"):
+                elif is_refusal:
                     refusal_detail = reasoning_text or "Unsafe statement blocked by guardrail. Read-only SELECT statements only."
                     refusal_speech = "I cannot run that query because only read-only SELECT queries are allowed."
                     status.update(label="Speaking...")

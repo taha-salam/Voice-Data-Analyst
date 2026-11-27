@@ -111,24 +111,41 @@ INSTRUCTIONS:
             raw_content = res.choices[0].message.content.strip()
             sql, reasoning = self._extract_sql_and_reasoning(raw_content)
         except Exception:
-            # Fallback direct generation
-            res = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-                max_tokens=1000
-            )
-            raw_content = res.choices[0].message.content.strip()
-            sql, reasoning = self._extract_sql_and_reasoning(raw_content)
+            try:
+                # Fallback direct generation
+                res = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=1000
+                )
+                raw_content = res.choices[0].message.content.strip()
+                sql, reasoning = self._extract_sql_and_reasoning(raw_content)
+            except Exception as exc:
+                err_msg = str(exc)
+                if "model_not_found" in err_msg or "404" in err_msg:
+                    err_msg = f"Groq Model Not Found (404) for '{self.model}'. Please check GROQ_MODEL in your .env."
+                return {
+                    "status": "error",
+                    "sql": None,
+                    "reasoning": f"LLM Generation Error: {err_msg}",
+                    "is_safe": False,
+                    "is_followup": True,
+                    "refusal": False,
+                    "error": err_msg,
+                    "previous_sql": last_turn.sql
+                }
 
         # Safety validation
         is_safe, error = SafetyGuardrail.validate_sql(sql, dialect=dialect)
         return {
+            "status": "ok" if is_safe else "refused",
             "sql": sql,
             "reasoning": reasoning or "Query modified based on follow-up.",
             "is_safe": is_safe,
             "is_followup": True,
             "refusal": not is_safe,
+            "error": error if not is_safe else None,
             "previous_sql": last_turn.sql
         }
 

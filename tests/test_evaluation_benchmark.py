@@ -67,3 +67,13 @@ def test_full_benchmark_runner_and_export():
     assert latency["sql_generation"]["mean_ms"] > 0
     assert latency["tts_synthesis"]["mean_ms"] > 0
     print(f"\n[LATENCY] Total turnaround mean: {latency['total_turnaround']['mean_ms']} ms")
+
+def test_acoustic_asr_wer_evaluation():
+    """Verify empirical acoustic ASR evaluation using TTS synthesis and Whisper transcription."""
+    engines = initialize_system()
+    runner = BenchmarkRunner(engines["db_mgr"], engines["profiles"], engines["corrector"])
+    res = runner.evaluate_acoustic_asr_wer(num_samples=2)
+    assert res["samples_evaluated"] == 2
+    assert "avg_acoustic_pre_wer" in res
+    assert "avg_acoustic_post_wer" in res
+    assert len(res["results"]) == 2

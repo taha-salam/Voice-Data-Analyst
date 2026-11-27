@@ -64,6 +64,11 @@ def test_database_manager_multi_source():
     assert len(df_csv) >= 2
     assert elapsed_csv >= 0
 
+    # 4. Source and Table Removal test
+    assert db_mgr.remove_csv_table("sales_reps") is True
+    assert db_mgr.remove_source("inventory") is True
+    assert db_mgr.get_source("inventory") is None
+
 def test_database_profiler():
     """Verify zero-config automated schema profiler discovers tables, columns, and sample values."""
     db_mgr = DatabaseManager()

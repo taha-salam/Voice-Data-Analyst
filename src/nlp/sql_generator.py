@@ -37,10 +37,12 @@ class SQLGenerator:
         is_intent_safe, refusal_reason = SafetyGuardrail.check_user_intent_safety(question)
         if not is_intent_safe:
             return {
+                "status": "refused",
                 "sql": None,
                 "reasoning": refusal_reason,
                 "is_safe": False,
                 "refusal": True,
+                "error": None,
                 "latency_seconds": round(time.perf_counter() - start_time, 3)
             }
 
@@ -51,10 +53,11 @@ Your task is to write a single, read-only SQL query that accurately answers the 
 CRITICAL RULES:
 1. DIALECT: Target SQL dialect is '{dialect.upper()}'. Use valid functions for this dialect (e.g. strftime for SQLite, date_trunc for Postgres/DuckDB).
 2. SAFETY: Generate ONLY read-only SELECT queries. NEVER generate DROP, DELETE, UPDATE, INSERT, ALTER, or PRAGMA statements.
-3. LIMITS: Always add 'LIMIT 100' unless the user asks for a specific limit or an aggregation with GROUP BY.
-4. SCHEMA: Use ONLY the tables and column names provided in the schema below. Do not invent columns.
-5. JOINS: Join tables using the foreign-key relationships specified in the schema.
-6. OUTPUT FORMAT: Return your response strictly as valid JSON with two fields:
+3. LIMITS: When the question asks for 'top' or 'best' without a specific number (e.g. 'top customers', 'top products'), limit results to 10 (LIMIT 10). Always add 'LIMIT 100' for general unaggregated queries unless the user specifies otherwise or uses GROUP BY.
+4. METRICS / 'BOTH': If the user asks for 'both' metrics (e.g., spend and order count), include both aggregations in the SELECT clause (e.g., SUM(payment_value) AS total_spend, COUNT(DISTINCT order_id) AS total_orders) and ORDER BY the primary one DESC.
+5. SCHEMA: Use ONLY the tables and column names provided in the schema below. Do not invent columns.
+6. JOINS: Join tables using the foreign-key relationships specified in the schema.
+7. OUTPUT FORMAT: Return your response strictly as valid JSON with two fields:
    - "sql": "The clean SQL query string without markdown fences"
    - "reasoning": "Brief 1-sentence explanation of how the query computes the result"
 
@@ -104,11 +107,16 @@ AVAILABLE SCHEMA:
                     sql_query = raw_text.strip()
                 reasoning = "Query generated from question."
             except Exception as inner_e:
+                err_msg = str(inner_e)
+                if "model_not_found" in err_msg or "404" in err_msg:
+                    err_msg = f"Groq Model Not Found (404) for '{self.model}'. Please verify GROQ_MODEL in your .env (recommended: openai/gpt-oss-120b or llama-3.3-70b-versatile)."
                 return {
+                    "status": "error",
                     "sql": None,
-                    "reasoning": f"LLM Generation Error: {inner_e}",
+                    "reasoning": f"LLM Generation Error: {err_msg}",
                     "is_safe": False,
                     "refusal": False,
+                    "error": err_msg,
                     "latency_seconds": round(time.perf_counter() - start_time, 3)
                 }
 
@@ -118,17 +126,21 @@ AVAILABLE SCHEMA:
 
         if not is_sql_safe:
             return {
+                "status": "refused",
                 "sql": sql_query,
                 "reasoning": f"Security Refusal: {sql_error}",
                 "is_safe": False,
                 "refusal": True,
+                "error": None,
                 "latency_seconds": round(latency, 3)
             }
 
         return {
+            "status": "ok",
             "sql": sql_query,
             "reasoning": reasoning,
             "is_safe": True,
             "refusal": False,
+            "error": None,
             "latency_seconds": round(latency, 3)
         }

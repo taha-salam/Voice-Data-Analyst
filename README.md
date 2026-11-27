@@ -3,7 +3,7 @@
 > **A conversational, voice-driven multi-source business intelligence platform with 100% offline local speech processing, dynamic domain word correction, and zero-trust AST database security.**
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
-[![Tests Passing](https://img.shields.io/badge/tests-27%20passed-brightgreen.svg)]()
+[![Tests Passing](https://img.shields.io/badge/tests-29%20passed-brightgreen.svg)]()
 [![Defense Success Rate](https://img.shields.io/badge/security%20guardrail-100%25%20blocked-success.svg)]()
 [![Local Speech](https://img.shields.io/badge/speech%20engine-100%25%20offline%20local-green.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -105,6 +105,7 @@ Evaluated on an automated benchmarking suite across 15 phonetic domain test case
 - Python 3.11, 3.12, or 3.13
 - Git
 - Free [Groq API Key](https://console.groq.com/)
+- **Local Text-to-Speech (Offline):** On Windows, `pyttsx3` uses native Microsoft SAPI5 out of the box with zero extra setup. On Linux / macOS, ensure `espeak` is installed (e.g., `sudo apt-get install espeak` or `brew install espeak`).
 
 ### 1. Clone the Repository
 ```bash
@@ -147,7 +148,7 @@ Open your browser to `http://localhost:8501`.
 
 ## 🧪 Running Automated Tests
 
-Run the full suite of **27 automated tests** (covering all 7 project phases):
+Run the full suite of **29 automated tests** (covering all 7 project phases):
 
 ```powershell
 .\.venv\Scripts\pytest.exe -v
@@ -229,7 +230,8 @@ Read the comprehensive report covering the 5 required Critical Analysis dimensio
 
 ---
 
-## 👤 Author
-- **Student Name:** Taha Salam
+## 👥 Project Team & Authors
+- **Taha Salam**
+- **Adil Taimoor (23i-0104)**
 - **Project:** Voice Data Analyst (Project 4)
 - **Course:** Natural Language Processing (Fall 2026)

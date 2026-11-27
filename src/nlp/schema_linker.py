@@ -9,54 +9,154 @@ from rapidfuzz import fuzz
 
 class MultiSourceRouter:
     """Routes a business question to the most appropriate connected database source."""
+
+    # Semantic intent boosts mapping query concepts to database signature columns and tables
+    DOMAIN_INTENT_BOOSTS = {
+        # E-Commerce, orders, revenue, customers -> Olist
+        "revenue": ["payment_value", "price", "order_payments", "orders", "order_items", "actual_sales"],
+        "sales": ["order_items", "orders", "price", "actual_sales"],
+        "order": ["orders", "order_items", "order_status"],
+        "orders": ["orders", "order_items", "order_status"],
+        "customer": ["customers", "customer_id", "customer_city", "customer_state"],
+        "customers": ["customers", "customer_id", "customer_city", "customer_state"],
+        "buyer": ["customers"],
+        "buyers": ["customers"],
+        "delivery": ["order_delivered_customer_date", "order_estimated_delivery_date"],
+        "delivered": ["order_delivered_customer_date", "order_status"],
+        "shipping": ["freight_value", "shipping_limit_date"],
+        "freight": ["freight_value"],
+        "review": ["order_reviews", "review_score"],
+        "reviews": ["order_reviews", "review_score"],
+        "payment": ["order_payments", "payment_type", "payment_value"],
+        "payments": ["order_payments", "payment_type", "payment_value"],
+        "category": ["product_category_name", "product_category_name_translation", "category"],
+        "categories": ["product_category_name", "product_category_name_translation", "category"],
+        
+        # Supply chain, warehousing, physical stock -> Inventory
+        "stock": ["inventory_stock", "quantity", "quantity_on_hand", "stock_quantity", "reorder_level"],
+        "inventory": ["inventory_stock", "inventory_id", "warehouses"],
+        "warehouse": ["warehouses", "warehouse_name", "warehouse_id", "location_city"],
+        "warehouses": ["warehouses", "warehouse_name", "warehouse_id", "location_city"],
+        "supplier": ["suppliers", "supplier_name", "lead_time_days"],
+        "suppliers": ["suppliers", "supplier_name", "lead_time_days"],
+        "restock": ["reorder_level", "quantity"],
+        "lead time": ["lead_time_days"],
+
+        # Sales Representatives & Quotas -> CSV / DuckDB
+        "rep": ["sales_reps", "rep_name", "rep_id"],
+        "reps": ["sales_reps", "rep_name", "rep_id"],
+        "representative": ["sales_reps", "rep_name"],
+        "representatives": ["sales_reps", "rep_name"],
+        "quota": ["target_sales", "target_quota"],
+        "quotas": ["target_sales", "target_quota"],
+        "commission": ["commission_rate"],
+        "commissions": ["commission_rate"],
+        "target": ["target_sales", "target_quota"]
+    }
     
     def __init__(self, db_manager):
         self.db_manager = db_manager
+
+    def route_query_detailed(self, query: str, profiles: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Scores each database source against the user query using table names, column semantics,
+        sample values, and domain concept boosts.
+        Returns a detailed dictionary with the chosen source, per-source scores, matched terms, and confidence.
+        """
+        query_lower = query.lower()
+        words = set(re.findall(r'\b\w+\b', query_lower))
+        source_scores: Dict[str, float] = {}
+        matched_terms: Dict[str, List[str]] = {}
+        
+        for src_name, profile in profiles.items():
+            score = 0.0
+            reasons = []
+            tables = profile.get("tables", {})
+
+            all_col_names = []
+            all_table_names = list(tables.keys())
+            for tname, meta in tables.items():
+                all_col_names.extend([c["name"].lower() for c in meta.get("columns", [])])
+
+            # 1. Domain Intent Boosts (Semantic concept matching)
+            for concept, target_signatures in self.DOMAIN_INTENT_BOOSTS.items():
+                if concept in words or concept in query_lower:
+                    matched_in_src = False
+                    for sig in target_signatures:
+                        if sig in all_table_names:
+                            score += 8.0
+                            reasons.append(f"concept '{concept}' matched table '{sig}'")
+                            matched_in_src = True
+                            break
+                        elif any(sig in cname for cname in all_col_names):
+                            score += 6.0
+                            reasons.append(f"concept '{concept}' matched column '{sig}'")
+                            matched_in_src = True
+                            break
+            
+            # 2. Direct table name matching
+            for tname, meta in tables.items():
+                t_clean = tname.lower().replace("_", " ")
+                if t_clean in query_lower or tname.lower() in query_lower:
+                    score += 5.0
+                    reasons.append(f"table '{tname}'")
+                elif fuzz.partial_ratio(t_clean, query_lower) > 75:
+                    score += 2.0
+                    
+                # 3. Direct column name matching
+                for col in meta.get("columns", []):
+                    cname = col["name"].lower().replace("_", " ")
+                    if len(cname) > 3 and cname in query_lower:
+                        score += 3.0
+                        reasons.append(f"column '{col['name']}' in '{tname}'")
+                    elif any(w in cname for w in words if len(w) > 4):
+                        score += 1.5
+                        
+                # 4. Sample value matching
+                for col_name, samples in meta.get("sample_values", {}).items():
+                    for s in samples:
+                        s_str = str(s).lower()
+                        if len(s_str) > 2 and s_str in query_lower:
+                            score += 4.0
+                            reasons.append(f"sample '{s_str}' in '{col_name}'")
+                            
+            source_scores[src_name] = round(score, 2)
+            matched_terms[src_name] = reasons
+
+        # Pick highest scoring source
+        sorted_sources = sorted(source_scores.items(), key=lambda x: x[1], reverse=True)
+        best_source, best_score = sorted_sources[0] if sorted_sources else ("olist", 0.0)
+        
+        # Check if top two are tied or very close (ambiguity detection)
+        is_ambiguous = False
+        confidence = 1.0
+        if len(sorted_sources) > 1 and best_score > 0:
+            second_source, second_score = sorted_sources[1]
+            if second_score > 0:
+                confidence = round((best_score - second_score) / best_score, 2)
+                if confidence < 0.15:
+                    is_ambiguous = True
+
+        if best_score <= 0.0:
+            # Fallback to olist or first available source
+            best_source = "olist" if "olist" in profiles else (next(iter(profiles.keys())) if profiles else "olist")
+            confidence = 0.5
+
+        return {
+            "source": best_source,
+            "scores": source_scores,
+            "matched_terms": matched_terms.get(best_source, []),
+            "all_matches": matched_terms,
+            "confidence": confidence,
+            "is_ambiguous": is_ambiguous
+        }
 
     def route_query(self, query: str, profiles: Dict[str, Dict[str, Any]]) -> str:
         """
         Scores each database source against the user query.
         Returns the name of the winning database source.
         """
-        query_lower = query.lower()
-        source_scores: Dict[str, float] = {}
-        
-        for src_name, profile in profiles.items():
-            score = 0.0
-            tables = profile.get("tables", {})
-            
-            # Check table names
-            for tname, meta in tables.items():
-                t_clean = tname.lower().replace("_", " ")
-                if t_clean in query_lower or tname.lower() in query_lower:
-                    score += 5.0
-                elif fuzz.partial_ratio(t_clean, query_lower) > 75:
-                    score += 2.0
-                    
-                # Check column names
-                for col in meta.get("columns", []):
-                    cname = col["name"].lower().replace("_", " ")
-                    if len(cname) > 3 and cname in query_lower:
-                        score += 3.0
-                        
-                # Check sample values
-                for col_name, samples in meta.get("sample_values", {}).items():
-                    for s in samples:
-                        s_str = str(s).lower()
-                        if len(s_str) > 2 and s_str in query_lower:
-                            score += 4.0
-                            
-            source_scores[src_name] = score
-
-        # If highest score > 0, return that source; otherwise default to primary source ('olist' or first)
-        best_source = max(source_scores.items(), key=lambda x: x[1], default=("olist", 0.0))
-        if best_source[1] > 0:
-            return best_source[0]
-            
-        # Default fallback
-        if "olist" in profiles:
-            return "olist"
-        return next(iter(profiles.keys())) if profiles else "olist"
+        return self.route_query_detailed(query, profiles)["source"]
 
 
 class SchemaLinker:

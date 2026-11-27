@@ -66,6 +66,79 @@ class BenchmarkRunner:
         self.repair = SelfRepairEngine()
         self.analytics = AnalyticsEngine()
         self.tts = LocalTTS(voice_speed=180)
+        self._stt = None
+
+    @property
+    def stt(self) -> LocalSTT:
+        """Lazily initialize faster-whisper STT engine for empirical acoustic evaluation."""
+        if self._stt is None:
+            self._stt = LocalSTT()
+        return self._stt
+
+    def evaluate_acoustic_asr_wer(self, num_samples: int = 5) -> Dict[str, Any]:
+        """
+        Empirically tests audio ASR: synthesizes real audio wav files via TTS,
+        transcribes them with faster-whisper, and measures WER before and after
+        domain word correction on actual acoustic waveforms.
+        """
+        test_sentences = [
+            ("what is the total revenue in sao paulo", "sao paulo"),
+            ("show all orders from belo horizonte", "belo horizonte"),
+            ("top products in informatica acessorios", "informatica acessorios"),
+            ("how many sellers are located in curitiba", "curitiba"),
+            ("average delivery time in rio de janeiro", "rio de janeiro"),
+        ][:num_samples]
+
+        results = []
+        pre_wers = []
+        post_wers = []
+
+        for ref_text, target_entity in test_sentences:
+            try:
+                # 1. Synthesize real acoustic audio
+                audio_path, _ = self.tts.synthesize_to_file(ref_text)
+                with open(audio_path, "rb") as f:
+                    audio_bytes = f.read()
+
+                # 2. Transcribe using faster-whisper
+                asr_res = self.stt.transcribe_audio_bytes(audio_bytes)
+                raw_whisper_text = asr_res.get("text", "").strip()
+
+                # 3. Apply Domain Word Correction
+                corrected_text, corrections = self.corrector.correct_transcript(raw_whisper_text)
+
+                # 4. Measure WER
+                pre_wer = compute_wer(ref_text, raw_whisper_text)
+                post_wer = compute_wer(ref_text, corrected_text)
+
+                pre_wers.append(pre_wer)
+                post_wers.append(post_wer)
+
+                results.append({
+                    "reference": ref_text,
+                    "whisper_asr_output": raw_whisper_text,
+                    "corrected_output": corrected_text,
+                    "pre_wer": round(pre_wer, 3),
+                    "post_wer": round(post_wer, 3),
+                    "corrections": corrections,
+                    "entity_recovered": target_entity.lower() in corrected_text.lower()
+                })
+            except Exception as e:
+                results.append({
+                    "reference": ref_text,
+                    "error": str(e)
+                })
+
+        avg_pre = statistics.mean(pre_wers) if pre_wers else 0.0
+        avg_post = statistics.mean(post_wers) if post_wers else 0.0
+
+        return {
+            "samples_evaluated": len(results),
+            "avg_acoustic_pre_wer": round(avg_pre, 4),
+            "avg_acoustic_post_wer": round(avg_post, 4),
+            "wer_reduction_percent": round(((avg_pre - avg_post) / avg_pre) * 100, 2) if avg_pre > 0 else 0.0,
+            "results": results
+        }
 
     def evaluate_domain_correction(self) -> Dict[str, Any]:
         """
@@ -172,14 +245,22 @@ class BenchmarkRunner:
                 else:
                     reason = "ALLOWED (VULNERABILITY)"
 
+            refusal_spoken = False
             if is_blocked:
                 blocked_count += 1
+                try:
+                    speech_text = "I cannot run that query because only read-only SELECT queries are allowed."
+                    _, tts_dur = self.tts.synthesize_to_file(speech_text)
+                    refusal_spoken = tts_dur >= 0
+                except Exception:
+                    refusal_spoken = False
 
             results.append({
                 "attack_name": attack_name,
                 "payload": attack_payload,
                 "type": attack_type,
                 "blocked": is_blocked,
+                "refusal_spoken": refusal_spoken,
                 "reason": reason
             })
 

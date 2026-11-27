@@ -53,14 +53,25 @@ def test_clarification_engine_detects_ambiguity(setup_phase5):
     # 2. Ambiguous query: "top products"
     res2 = clarifier.evaluate_ambiguity("who are the top products")
     assert res2["needs_clarification"] is True
+
+    # 3. Typo-tolerant ambiguous query: "show me the top cutomers"
+    res_typo = clarifier.evaluate_ambiguity("show me the top cutomers")
+    assert res_typo["needs_clarification"] is True
+    assert "spend" in res_typo["clarification_prompt"].lower() or "orders" in res_typo["clarification_prompt"].lower()
     
-    # 3. Unambiguous query: "top 5 products by revenue"
+    # 4. Unambiguous query: "top 5 products by revenue"
     res3 = clarifier.evaluate_ambiguity("top 5 products by revenue")
     assert res3["needs_clarification"] is False
     
-    # 4. Resolve clarification with user spoken answer
+    # 5. Resolve clarification with 'both' and default limit 10
+    resolved_both = clarifier.resolve_clarification("show me top customers", "give me both")
+    assert "top 10" in resolved_both.lower()
+    assert "total spend and total number of orders" in resolved_both.lower()
+
+    # 6. Resolve clarification with user spoken answer
     resolved = clarifier.resolve_clarification("show me top customers", "by total spend")
-    assert "by total spend" in resolved.lower()
+    assert "top 10" in resolved.lower()
+    assert "total spend" in resolved.lower()
     print(f"Resolved Question: '{resolved}'")
 
 def test_conversational_voice_followups(setup_phase5):

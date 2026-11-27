@@ -53,6 +53,8 @@ class DomainWordCorrector:
             "voucher": "voucher",
             "boleto": "boleto"
         }
+        # Tracking of entity keys harvested by data source name
+        self.source_entities: Dict[str, Set[str]] = {}
         for alias, target in self.custom_aliases.items():
             self.entity_index[alias.lower()] = target
             self.entity_types[alias.lower()] = "alias"
@@ -63,6 +65,7 @@ class DomainWordCorrector:
         for any entity-like columns (cities, categories, names, types, statuses).
         Works for SQLite, DuckDB, or PostgreSQL without hardcoded schema.
         """
+        keys_before = set(self.entity_index.keys())
         try:
             if db_source.engine_type == "sqlite":
                 self._harvest_sqlite(db_source.uri_or_path)
@@ -70,6 +73,19 @@ class DomainWordCorrector:
                 self._harvest_duckdb(db_source.get_connection())
         except Exception as e:
             print(f"Warning: harvest_from_database encountered an error on {db_source.name}: {e}")
+        finally:
+            new_keys = set(self.entity_index.keys()) - keys_before
+            self.source_entities.setdefault(db_source.name, set()).update(new_keys)
+
+    def remove_from_source(self, source_name: str):
+        """
+        Removes all harvested entities associated with a specific database source.
+        Predefined custom aliases remain intact.
+        """
+        keys = self.source_entities.pop(source_name, set())
+        for k in keys:
+            self.entity_index.pop(k, None)
+            self.entity_types.pop(k, None)
 
     def _harvest_sqlite(self, db_path: str):
         with sqlite3.connect(db_path) as conn:

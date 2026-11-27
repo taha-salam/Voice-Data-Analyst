@@ -81,6 +81,31 @@ class DatabaseManager:
     def get_source(self, name: str) -> Optional[DatabaseSource]:
         return self.sources.get(name)
 
+    def remove_source(self, name: str) -> bool:
+        """Removes a registered database source by name and closes active connections."""
+        if name in self.sources:
+            source = self.sources.pop(name)
+            if source._duckdb_con is not None:
+                try:
+                    source._duckdb_con.close()
+                except Exception:
+                    pass
+            return True
+        return False
+
+    def remove_csv_table(self, table_name: str) -> bool:
+        """Drops a specific CSV table from the shared DuckDB in-memory source."""
+        source = self.sources.get("csv_duckdb")
+        if source:
+            try:
+                con = source.get_connection()
+                safe_table = "".join(c for c in table_name if c.isalnum() or c == "_")
+                con.execute(f"DROP TABLE IF EXISTS {safe_table}")
+                return True
+            except Exception:
+                pass
+        return False
+
     def list_sources(self) -> List[Dict[str, Any]]:
         return [
             {
