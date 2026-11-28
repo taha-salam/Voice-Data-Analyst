@@ -172,3 +172,21 @@ def test_schema_linker_pruning_and_bridge(setup_phase3):
     res3 = linker.link_schema("Total revenue for products ordered in March")
     selected3 = res3["selected_tables"]
     assert "order_items" in selected3  # Order items has price and connects products to orders
+
+
+def test_top_customers_by_spend_links_payment_tables_and_routes_to_olist(setup_phase3):
+    """'top 10 customers ranked by total spend' must route to olist and link customers, orders, and order_payments."""
+    db_mgr = setup_phase3["db_mgr"]
+    profiles = setup_phase3["profiles"]
+    router = MultiSourceRouter(db_mgr)
+    linker = SchemaLinker(profiles["olist"])
+
+    query = "top 10 customers ranked by total spend"
+    assert router.route_query(query, profiles) == "olist"
+
+    linked = linker.link_schema(query)
+    selected = set(linked["selected_tables"])
+    assert {"customers", "orders", "order_payments"}.issubset(selected)
+    assert "TABLE: customers" in linked["schema_prompt"]
+    assert "TABLE: orders" in linked["schema_prompt"]
+    assert "TABLE: order_payments" in linked["schema_prompt"]

@@ -14,6 +14,14 @@ class MultiSourceRouter:
     DOMAIN_INTENT_BOOSTS = {
         # E-Commerce, orders, revenue, customers -> Olist
         "revenue": ["payment_value", "price", "order_payments", "orders", "order_items", "actual_sales"],
+        "spend": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "spent": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "spending": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "expenditure": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "purchases": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "purchase": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "paid": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "pay": ["order_payments", "payment_value", "orders", "order_items", "price"],
         "sales": ["order_items", "orders", "price", "actual_sales"],
         "order": ["orders", "order_items", "order_status"],
         "orders": ["orders", "order_items", "order_status"],
@@ -165,6 +173,14 @@ class SchemaLinker:
     # Semantic keyword mappings for business queries
     CONCEPT_KEYWORDS = {
         "revenue": ["price", "freight_value", "payment_value", "actual_sales"],
+        "spend": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "spent": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "spending": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "expenditure": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "purchases": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "purchase": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "paid": ["order_payments", "payment_value", "orders", "order_items", "price"],
+        "pay": ["order_payments", "payment_value", "orders", "order_items", "price"],
         "sales": ["price", "order_items", "actual_sales", "orders"],
         "price": ["price", "unit_cost"],
         "cost": ["price", "unit_cost", "freight_value"],
@@ -186,13 +202,40 @@ class SchemaLinker:
         "seller": ["sellers", "seller_id"]
     }
 
+    # Aggregate/metric intent words that trigger 1-hop join-key schema expansion
+    AGG_METRIC_WORDS = {
+        "revenue", "sales", "total", "sum", "count", "most", "top",
+        "average", "avg", "spend", "spent", "spending", "income",
+    }
+    AGG_METRIC_PHRASES = ("how many",)
+
+    # Generic numeric metric column keywords (database-agnostic)
+    METRIC_COLUMN_KEYWORDS = (
+        "qty", "quantity", "price", "unit_price", "amount",
+        "cost", "value", "total", "tip",
+    )
+    NON_NUMERIC_TYPE_KEYWORDS = ("char", "text", "str", "clob", "date", "time", "bool")
+
     def __init__(self, profile: Dict[str, Any]):
         self.profile = profile
         self.tables = profile.get("tables", {})
         self.fk_graph = self._build_fk_graph()
 
+    @classmethod
+    def _has_metric_column(cls, table_meta: Dict[str, Any]) -> bool:
+        """Returns True if the table has a numeric column whose name looks like a metric."""
+        for col in table_meta.get("columns", []):
+            cname = col["name"].lower()
+            ctype = str(col.get("type", "")).lower()
+            if ctype and any(tok in ctype for tok in cls.NON_NUMERIC_TYPE_KEYWORDS):
+                continue
+            tokens = set(re.split(r"[^a-z0-9]+", cname))
+            if cname in cls.METRIC_COLUMN_KEYWORDS or any(kw in tokens for kw in cls.METRIC_COLUMN_KEYWORDS):
+                return True
+        return False
+
     def _build_fk_graph(self) -> Dict[str, Set[str]]:
-        """Builds an undirected adjacency graph of tables connected by foreign keys or common ID columns."""
+        """Builds an undirected adjacency graph of tables connected by foreign keys or common ID/PK columns."""
         graph = {t: set() for t in self.tables}
         
         # 1. Direct declared foreign keys
@@ -203,12 +246,17 @@ class SchemaLinker:
                     graph[table].add(to_tbl)
                     graph[to_tbl].add(table)
                     
-        # 2. Heuristic ID-based column name matching (e.g. customer_id across orders and customers)
-        col_to_tables = {}
+        # 2. Heuristic ID-based and primary-key column name matching (e.g. item_id, branch_id, customer_id)
+        pk_cols: Set[str] = set()
+        for meta in self.tables.values():
+            for pk in meta.get("primary_keys", []):
+                pk_cols.add(pk.lower())
+
+        col_to_tables: Dict[str, Set[str]] = {}
         for table, meta in self.tables.items():
             for col in meta.get("columns", []):
                 cname = col["name"].lower()
-                if cname.endswith("_id") or cname == "id":
+                if cname.endswith("_id") or cname == "id" or cname in pk_cols:
                     col_to_tables.setdefault(cname, set()).add(table)
                     
         for cname, tbls in col_to_tables.items():
@@ -287,6 +335,45 @@ class SchemaLinker:
                     common_bridges = self.fk_graph.get(t1, set()).intersection(self.fk_graph.get(t2, set()))
                     if common_bridges:
                         connected_selected.add(next(iter(common_bridges)))
+
+        # Ensure customers + money queries include the full join path (customers -> orders -> order_payments)
+        has_customer_term = "customer" in query_lower
+        money_words = {"spend", "spent", "spending", "revenue", "sales", "paid", "payment", "payments"}
+        has_money_term = bool(query_words & money_words)
+        if has_customer_term and has_money_term:
+            for required_table in ("customers", "orders", "order_payments"):
+                if required_table in self.tables:
+                    connected_selected.add(required_table)
+
+        # Join-aware 1-hop expansion for aggregate/metric queries (database-agnostic, up to 5 tables)
+        has_agg_or_metric = bool(query_words & self.AGG_METRIC_WORDS) or any(
+            phrase in query_lower for phrase in self.AGG_METRIC_PHRASES
+        )
+        if has_agg_or_metric and len(connected_selected) < 5:
+            one_hop_neighbors: Set[str] = set()
+            for tname in list(connected_selected):
+                one_hop_neighbors.update(self.fk_graph.get(tname, set()))
+            one_hop_neighbors -= connected_selected
+
+            metric_neighbors = sorted(
+                (t for t in one_hop_neighbors if self._has_metric_column(self.tables[t])),
+                key=lambda t: (-table_scores.get(t, 0.0), t),
+            )
+            for neighbor in metric_neighbors:
+                if len(connected_selected) >= 5:
+                    break
+                connected_selected.add(neighbor)
+
+            # If still only 1 table linked, add other 1-hop join neighbors (up to max_tables / 5)
+            if len(connected_selected) < 2:
+                other_neighbors = sorted(
+                    one_hop_neighbors - connected_selected,
+                    key=lambda t: (-table_scores.get(t, 0.0), t),
+                )
+                for neighbor in other_neighbors:
+                    if len(connected_selected) >= min(max_tables, 5):
+                        break
+                    connected_selected.add(neighbor)
 
         # Format compact schema definition
         compact_schema = []

@@ -128,31 +128,38 @@ RULES:
 3. Use only existing columns and tables from the schema.
 4. Output format: Return JSON with key "repaired_sql".
 """
+        create_kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 1500,
+        }
+        if "gpt-oss" in (self.model or "").lower():
+            create_kwargs["reasoning_effort"] = "low"
+            create_kwargs["include_reasoning"] = False
+
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-                max_tokens=500,
+                **create_kwargs,
                 response_format={"type": "json_object"}
             )
-            raw = response.choices[0].message.content.strip()
-            parsed = json.loads(raw)
-            return parsed.get("repaired_sql", failed_sql).strip()
+            raw = (response.choices[0].message.content or "").strip()
+            if raw:
+                parsed = json.loads(raw)
+                repaired = str(parsed.get("repaired_sql") or "").strip()
+                if repaired:
+                    return repaired
+            return failed_sql
         except Exception:
             # Fallback regex extraction if json fails
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.0,
-                    max_tokens=500
-                )
-                text = response.choices[0].message.content.strip()
+                response = self.client.chat.completions.create(**create_kwargs)
+                text = (response.choices[0].message.content or "").strip()
+                if not text:
+                    return failed_sql
                 import re
                 match = re.search(r'```(?:sql)?(.*?)```', text, re.DOTALL)
-                if match:
-                    return match.group(1).strip()
-                return text.strip()
+                repaired = match.group(1).strip() if match else text.strip()
+                return repaired or failed_sql
             except Exception:
                 return failed_sql

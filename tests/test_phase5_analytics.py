@@ -164,3 +164,120 @@ def test_spoken_insight_generation_and_audio_synthesis(setup_phase5):
     assert audio_path != ""
     assert latency > 0.0
     print(f"Synthesized Audio Path: {audio_path} ({latency:.2f}s)")
+
+
+def test_empty_content_with_reasoning_uses_template_fallback():
+    """A mocked response with empty content and planning text in reasoning must use the template summary."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    engine = AnalyticsEngine(api_key="test-key", model="openai/gpt-oss-120b")
+    mock_message = SimpleNamespace(
+        content="",
+        reasoning="We need to produce one punchy sentence under 20 words... Let's craft:",
+    )
+    mock_response = SimpleNamespace(choices=[SimpleNamespace(message=mock_message)])
+    engine.client = MagicMock()
+    engine.client.chat.completions.create.return_value = mock_response
+
+    df = pd.DataFrame({
+        "category": ["electronics", "furniture", "toys"],
+        "revenue": [52000.5, 34500.0, 13500.0],
+    })
+    sql = "SELECT category, SUM(revenue) AS revenue FROM sales GROUP BY category ORDER BY revenue DESC LIMIT 3"
+
+    summary = engine.generate_spoken_insight(df, "Top 3 categories by revenue", sql)
+
+    # Verify Groq call parameters for gpt-oss models
+    call_kwargs = engine.client.chat.completions.create.call_args.kwargs
+    assert call_kwargs["max_tokens"] == 400
+    assert call_kwargs["reasoning_effort"] == "low"
+    assert call_kwargs["include_reasoning"] is False
+
+    # Verify reasoning text is never spoken and template fallback is used
+    assert "we need" not in summary.lower()
+    assert "let's craft" not in summary.lower()
+    assert summary == (
+        "Among the top 3 results, electronics leads with 52,000.50. "
+        "The rows shown total 100,000.50."
+    )
+
+
+def test_summary_validator_rejects_invalid_and_accepts_valid():
+    """Verify the spoken summary validator enforces length, banned phrases, and terminal punctuation."""
+    assert AnalyticsEngine._is_valid_summary("March led the four months with 52,000 in sales.") is True
+    assert AnalyticsEngine._is_valid_summary("Sales peaked in March!") is True
+    assert AnalyticsEngine._is_valid_summary("Did March lead with 52,000?") is True
+
+    # Empty or whitespace
+    assert AnalyticsEngine._is_valid_summary("") is False
+    assert AnalyticsEngine._is_valid_summary("   ") is False
+
+    # Longer than 40 words
+    long_text = " ".join(["word"] * 41) + "."
+    assert AnalyticsEngine._is_valid_summary(long_text) is False
+
+    # Banned phrases (case-insensitive)
+    assert AnalyticsEngine._is_valid_summary("We need to explain March sales.") is False
+    assert AnalyticsEngine._is_valid_summary("Let's craft a quick answer.") is False
+    assert AnalyticsEngine._is_valid_summary("This MUST BE UNDER twenty words.") is False
+    assert AnalyticsEngine._is_valid_summary("The user asked about March.") is False
+    assert AnalyticsEngine._is_valid_summary("Summarizing the top rows shows March.") is False
+
+    # Missing terminal punctuation (e.g., cut off mid-sentence)
+    assert AnalyticsEngine._is_valid_summary("March led the four months with 52,000") is False
+
+
+def test_summarizer_does_not_praise_leader_when_all_metrics_are_zero_or_null():
+    """When ranked results have all zero or null metric values, summarizer must not claim a leader."""
+    from unittest.mock import MagicMock
+
+    engine = AnalyticsEngine(api_key="test-key", model="openai/gpt-oss-120b")
+    engine.client = MagicMock()
+
+    df_zeros = pd.DataFrame({
+        "customer_id": ["cust_1", "cust_2", "cust_3"],
+        "spend": [0.0, 0.0, 0.0],
+    })
+    sql = "SELECT customer_id, SUM(payment_value) AS spend FROM customers GROUP BY customer_id ORDER BY spend DESC LIMIT 3"
+
+    summary_zeros = engine.generate_spoken_insight(df_zeros, "top 3 customers by spend", sql)
+    assert "leads" not in summary_zeros.lower()
+    assert "cust_1" not in summary_zeros.lower()
+    assert "no spend values" in summary_zeros.lower()
+    assert "incomplete" in summary_zeros.lower()
+    engine.client.chat.completions.create.assert_not_called()
+
+    df_nulls = pd.DataFrame({
+        "customer_id": ["cust_1", "cust_2"],
+        "spend": [None, None],
+    })
+    summary_nulls = engine.generate_spoken_insight(df_nulls, "top 2 customers by spend", sql)
+    assert "leads" not in summary_nulls.lower()
+    assert "cust_1" not in summary_nulls.lower()
+    assert "no spend values" in summary_nulls.lower()
+
+
+def test_followup_detection_rejects_standalone_and_cross_source_but_keeps_references():
+    """Standalone questions and cross-source queries must not be follow-ups; explicit references must be."""
+    memory = ConversationMemory(api_key="test-key", model="openai/gpt-oss-120b")
+    memory.add_turn(
+        question="Which branch sold the most?",
+        sql="SELECT branch_name, SUM(qty) FROM tickets GROUP BY branch_name",
+        source_name="cafe_db",
+        row_count=3,
+    )
+
+    # Standalone questions after an unrelated turn must NOT be follow-ups
+    assert memory.is_followup("total revenue by category?") is False
+    assert memory.is_followup("What is the total revenue by category?") is False
+    assert memory.is_followup("top 10 customers by spend") is False
+
+    # Explicit reference follow-up on the same source MUST still be a follow-up
+    assert memory.is_followup("now break it down by month") is True
+    assert memory.is_followup("now break it down by month", current_source="cafe_db") is True
+    assert memory.is_followup("same for last year", current_source="cafe_db") is True
+    assert memory.is_followup("by month", current_source="cafe_db") is True
+
+    # Cross-source query must NOT be a follow-up even if it contains a reference word
+    assert memory.is_followup("now break it down by month", current_source="olist") is False

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-27 17:45:29",
+  "timestamp": "2026-11-27 22:41:19",
   "domain_correction_benchmark": {
     "total_cases": 15,
     "avg_pre_wer": 0.1511,
@@ -336,44 +336,44 @@
   },
   "latency_breakdown_benchmark": {
     "domain_correction": {
-      "mean_ms": 3.0,
-      "min_ms": 2.07,
-      "max_ms": 3.89
+      "mean_ms": 4.99,
+      "min_ms": 3.85,
+      "max_ms": 6.38
     },
     "source_routing": {
-      "mean_ms": 0.94,
-      "min_ms": 0.75,
-      "max_ms": 1.11
+      "mean_ms": 1.74,
+      "min_ms": 1.52,
+      "max_ms": 2.02
     },
     "schema_linking": {
-      "mean_ms": 1.38,
-      "min_ms": 1.13,
-      "max_ms": 1.69
+      "mean_ms": 2.23,
+      "min_ms": 1.22,
+      "max_ms": 2.82
     },
     "sql_generation": {
-      "mean_ms": 1079.41,
-      "min_ms": 725.89,
-      "max_ms": 1266.78
+      "mean_ms": 1058.33,
+      "min_ms": 653.66,
+      "max_ms": 1634.74
     },
     "db_execution": {
-      "mean_ms": 8.6,
-      "min_ms": 3.33,
-      "max_ms": 12.79
+      "mean_ms": 20.72,
+      "min_ms": 10.91,
+      "max_ms": 34.91
     },
     "spoken_insight": {
-      "mean_ms": 665.74,
-      "min_ms": 626.26,
-      "max_ms": 715.32
+      "mean_ms": 499.73,
+      "min_ms": 2.69,
+      "max_ms": 774.08
     },
     "tts_synthesis": {
-      "mean_ms": 525.9,
-      "min_ms": 249.11,
-      "max_ms": 708.25
+      "mean_ms": 423.14,
+      "min_ms": 264.72,
+      "max_ms": 573.16
     },
     "total_turnaround": {
-      "mean_ms": 2284.99,
-      "min_ms": 2099.46,
-      "max_ms": 2619.97
+      "mean_ms": 2010.92,
+      "min_ms": 1108.45,
+      "max_ms": 2665.19
     }
   }
 }

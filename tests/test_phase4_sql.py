@@ -135,3 +135,107 @@ def test_self_repair_loop_fixes_bad_sql(setup_phase4):
     print(f"Attempts:    {repair_result['attempts']}")
     print(f"Result Value: {repair_result['df'].iloc[0, 0]}")
     assert "price" in fixed_sql.lower()
+
+
+def test_empty_sql_retries_once_and_returns_error_not_refused():
+    """Empty SQL must retry once with an explicit instruction, and a second empty response returns status 'error' (not 'refused')."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    sql_gen = SQLGenerator(api_key="test-key", model="openai/gpt-oss-120b")
+    empty_resp_1 = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""))])
+    empty_resp_2 = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"sql": "   ", "reasoning": ""}'))])
+
+    sql_gen.client = MagicMock()
+    sql_gen.client.chat.completions.create.side_effect = [empty_resp_1, empty_resp_2]
+
+    result = sql_gen.generate_sql(
+        question="Show me top 10 customers by total spend",
+        schema_prompt="Table customers (customer_id), Table order_payments (order_id, payment_value)",
+        dialect="sqlite",
+    )
+
+    assert sql_gen.client.chat.completions.create.call_count == 2
+
+    first_kwargs = sql_gen.client.chat.completions.create.call_args_list[0].kwargs
+    second_kwargs = sql_gen.client.chat.completions.create.call_args_list[1].kwargs
+
+    for call_kwargs in (first_kwargs, second_kwargs):
+        assert call_kwargs["max_tokens"] == 1500
+        assert call_kwargs["reasoning_effort"] == "low"
+        assert call_kwargs["include_reasoning"] is False
+
+    assert second_kwargs["messages"][-1]["content"] == "Return only the JSON object with a non-empty sql field"
+
+    assert result["status"] == "error"
+    assert result["status"] != "refused"
+    assert result["is_safe"] is False
+    assert result["refusal"] is False
+    assert result["sql"] is None
+    assert result["reasoning"] == "The model did not return a query. Please try again."
+    assert result["error"] == "The model did not return a query. Please try again."
+
+
+def test_empty_sql_retry_recovers_when_second_attempt_returns_sql():
+    """If the first attempt returns empty content and the retry returns valid SQL, generate_sql returns status 'ok'."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    sql_gen = SQLGenerator(api_key="test-key", model="openai/gpt-oss-120b")
+    empty_resp = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""))])
+    valid_resp = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"sql": "SELECT customer_id, SUM(payment_value) AS total_spend FROM order_payments GROUP BY customer_id ORDER BY total_spend DESC LIMIT 10", "reasoning": "Top 10 customers by spend."}'
+                )
+            )
+        ]
+    )
+
+    sql_gen.client = MagicMock()
+    sql_gen.client.chat.completions.create.side_effect = [empty_resp, valid_resp]
+
+    result = sql_gen.generate_sql(
+        question="Show me top 10 customers by total spend",
+        schema_prompt="Table order_payments (customer_id, payment_value)",
+        dialect="sqlite",
+    )
+
+    assert sql_gen.client.chat.completions.create.call_count == 2
+    assert result["status"] == "ok"
+    assert result["is_safe"] is True
+    assert result["refusal"] is False
+    assert "SELECT customer_id" in result["sql"]
+
+
+def test_sql_generation_prompt_contains_revenue_rule_and_uses_temperature_zero():
+    """SQL generation prompt must define revenue/sales as item price or payment amount only, and use temperature=0."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    sql_gen = SQLGenerator(api_key="test-key", model="openai/gpt-oss-120b")
+    valid_resp = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"sql": "SELECT category, SUM(price) AS revenue FROM items GROUP BY category", "reasoning": "Sum of item price."}'
+                )
+            )
+        ]
+    )
+    sql_gen.client = MagicMock()
+    sql_gen.client.chat.completions.create.return_value = valid_resp
+
+    result = sql_gen.generate_sql(
+        question="total revenue by category?",
+        schema_prompt="TABLE: items\n  Columns: category (TEXT), price (REAL), freight (REAL)",
+        dialect="sqlite",
+    )
+
+    assert result["status"] == "ok"
+    call_kwargs = sql_gen.client.chat.completions.create.call_args.kwargs
+    assert call_kwargs["temperature"] == 0.0
+    system_prompt = call_kwargs["messages"][0]["content"].lower()
+    assert '"revenue" and "sales" mean the sum of the item price' in system_prompt
+    assert "do not add shipping, freight, tax, discounts, or fees" in system_prompt

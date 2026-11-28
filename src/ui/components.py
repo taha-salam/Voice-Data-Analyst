@@ -213,9 +213,9 @@ def format_total_metric_label(column_name: str) -> str:
 
 def build_numeric_kpi(df_result: pd.DataFrame) -> Optional[Tuple[str, str]]:
     """
-    Build the numeric summary KPI (label, formatted_value) for the first numeric column.
-    Returns None (hiding the card) if there are no numeric columns or if the column
-    looks like an average, rate, percentage, ratio, or score.
+    Build the numeric summary KPI (label, formatted_value) for the first summable numeric column.
+    Skips ID, rank, and index columns. Returns None (hiding the card) if no suitable numeric
+    column remains or if it looks like an average, rate, percentage, ratio, or score.
     """
     if df_result is None or df_result.empty:
         return None
@@ -224,9 +224,46 @@ def build_numeric_kpi(df_result: pd.DataFrame) -> Optional[Tuple[str, str]]:
     if len(numeric_cols) == 0:
         return None
 
-    primary_col = str(numeric_cols[0])
-    col_lower = primary_col.lower()
+    primary_col: Optional[str] = None
+    col_lower = ""
+    for col in numeric_cols:
+        cname = str(col)
+        clower = cname.lower()
+        if (
+            clower == "id"
+            or clower.endswith("_id")
+            or clower.startswith("id_")
+            or clower in ("rank", "row_num", "row_number", "rownum", "index", "idx")
+            or clower.endswith("_rank")
+            or clower.startswith("rank_")
+            or clower.endswith("_index")
+            or clower.startswith("index_")
+        ):
+            continue
+        primary_col = cname
+        col_lower = clower
+        break
+
+    if primary_col is None:
+        return None
+
     if any(keyword in col_lower for keyword in NON_SUMMABLE_KPI_KEYWORDS):
+        return None
+
+    aggregate_keywords = (
+        "total", "sum", "count", "cnt", "avg", "average", "mean",
+        "min", "max", "revenue", "sales", "spend", "spent", "spending",
+        "income", "profit", "margin", "orders",
+    )
+    is_aggregate_col = any(keyword in col_lower for keyword in aggregate_keywords)
+
+    # Never sum raw quantity-like columns (qty, quantity, units) in a row listing
+    col_tokens = set(re.split(r"[^a-z0-9]+", col_lower))
+    if not is_aggregate_col and bool(col_tokens & {"qty", "quantity", "units"}):
+        return None
+
+    # Hide the card for long plain row listings (> 20 rows with no aggregate)
+    if len(df_result) > 20 and not is_aggregate_col:
         return None
 
     series = df_result[primary_col].dropna()
